@@ -1,2 +1,2 @@
-# goat
+# goat 
 GO Approximation of Typer 
