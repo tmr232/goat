@@ -13,12 +13,12 @@ type BaseArgs struct {
 }
 
 type HelloArgs struct {
-	BaseArgs `embed:""`
-	Name     goat.Optional[string] `name:"name"`
+	BaseArgs
+	Name goat.Optional[string] `name:"name"`
 }
 
 func Hello(args HelloArgs) error {
-	fmt.Println("Hello ", args.Name)
+	fmt.Println("Hello ", args.Name, args.Flag.Value)
 	return nil
 }
 
@@ -34,14 +34,14 @@ func Goodbye(args GoodbyeArgs) error {
 func main() {
 	app := goat.App(
 		"hello-world",
+		goat.Usage("Greets things & people."),
 		goat.Command("hello", Hello),
 		goat.Command("goodbye", Goodbye, goat.Usage("Says goodbye.")),
 		goat.Group("say",
+			goat.Usage("Says many things."),
 			goat.Command("hello", Hello),
 			goat.Command("goodbye", Goodbye),
-			goat.Usage("Says many things."),
 		),
-		goat.Usage("Greets things & people."),
 	)
 
 	err := app.Run(os.Args)

@@ -74,6 +74,20 @@ func makeFlag(field reflect.StructField) cli.Flag {
 	panic("Unsupported type!")
 }
 
+type isGoatType interface {
+	isGoatType()
+}
+
+func (o Optional[T]) isGoatType() {}
+
+func shouldEmbed(fieldType reflect.Type) bool {
+	if fieldType.Kind() != reflect.Struct {
+		return false
+	}
+	_, isGoatType := reflect.New(fieldType).Elem().Interface().(isGoatType)
+	return !isGoatType
+}
+
 func buildFlags(argsType reflect.Type) (flags []cli.Flag) {
 	if argsType.Kind() != reflect.Struct {
 		panic("Args must be a struct type!")
@@ -81,8 +95,7 @@ func buildFlags(argsType reflect.Type) (flags []cli.Flag) {
 
 	for i := 0; i < argsType.NumField(); i++ {
 		field := argsType.Field(i)
-		_, embed := field.Tag.Lookup("embed")
-		if embed {
+		if shouldEmbed(field.Type) {
 			flags = append(flags, buildFlags(field.Type)...)
 		} else {
 			flags = append(flags, makeFlag(field))
@@ -100,7 +113,7 @@ func wrapValue[T any](value T, optional bool) any {
 
 func getField(c *cli.Context, field reflect.StructField) (any, bool) {
 	name := field.Name
-	alias, hasAlias := field.Tag.Lookup("goat")
+	alias, hasAlias := field.Tag.Lookup("name")
 	if hasAlias {
 		name = alias
 	}
@@ -150,6 +163,23 @@ func getField(c *cli.Context, field reflect.StructField) (any, bool) {
 	return nil, false
 }
 
+func setArgs(argsValue reflect.Value, c *cli.Context) {
+	argsType := argsValue.Type()
+
+	for i := 0; i < argsType.NumField(); i++ {
+		field := argsType.Field(i)
+		if shouldEmbed(field.Type) {
+			setArgs(argsValue.Field(i), c)
+		} else {
+			value, isSet := getField(c, field)
+			if isSet {
+				fieldValue := argsValue.Field(i)
+				fieldValue.Set(reflect.ValueOf(value))
+			}
+		}
+	}
+}
+
 func buildAction[Args any](action func(Args) error) func(c *cli.Context) error {
 	actionType := reflect.TypeOf(action)
 	if actionType.Kind() != reflect.Func {
@@ -159,21 +189,12 @@ func buildAction[Args any](action func(Args) error) func(c *cli.Context) error {
 		panic("Must take an arguments struct")
 	}
 
-	argsType := actionType.In(0)
-
 	actionFunc := func(c *cli.Context) error {
 		var args Args
 
-		argsValue := reflect.ValueOf(&args)
+		argsValue := reflect.ValueOf(&args).Elem()
 
-		for i := 0; i < argsType.NumField(); i++ {
-			field := argsType.Field(i)
-			value, isSet := getField(c, field)
-			if isSet {
-				fieldValue := argsValue.Elem().Field(i)
-				fieldValue.Set(reflect.ValueOf(value))
-			}
-		}
+		setArgs(argsValue, c)
 
 		return action(args)
 	}
