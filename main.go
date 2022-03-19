@@ -2,30 +2,43 @@ package main
 
 import (
 	"fmt"
-	"github.com/tmr232/goat/goat"
 	"log"
 	"os"
+
+	"github.com/tmr232/goat/goat"
 )
 
-type SomeArgs struct {
-	Name          string                `goat:"name"`
-	Flag          goat.Optional[bool]   `goat:"flag"`
-	YetAnotherVar goat.Optional[string] `goat:"yet-another-var"`
+type HelloArgs struct {
+	Name string `goat:"name"`
 }
 
-func Action(args SomeArgs) error {
-	fmt.Println("Name: ", args.Name)
-	fmt.Println("Flag: ", args.Flag)
-	fmt.Println("YetAnotherVar: ", args.YetAnotherVar)
+func Hello(args HelloArgs) error {
+	fmt.Println("Hello ", args.Name)
+	return nil
+}
+
+type GoodbyeArgs struct {
+	Name string `goat:"name"`
+}
+
+func Goodbye(args GoodbyeArgs) error {
+	fmt.Println("Goodbye ", args.Name)
 	return nil
 }
 
 func main() {
-	app := goat.MakeApp(Action)
+	app := goat.App(
+		"hello-world",
+		goat.Command("hello", Hello),
+		goat.Command("goodbye", Goodbye),
+		goat.Group("say",
+			goat.Command("hello", Hello),
+			goat.Command("goodbye", Goodbye),
+		),
+	)
 
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 }

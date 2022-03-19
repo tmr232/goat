@@ -1,8 +1,9 @@
 package goat
 
 import (
-	"github.com/urfave/cli"
 	"reflect"
+
+	"github.com/urfave/cli"
 )
 
 type Optional[T any] struct {
@@ -112,18 +113,64 @@ func buildAction[Args any](action func(Args) error) func(c *cli.Context) error {
 	return actionFunc
 }
 
-func MakeApp[Args any](app func(Args) error) *cli.App {
-	appType := reflect.TypeOf(app)
-	if appType.Kind() != reflect.Func {
-		panic("Must be a function type!")
-	}
-	if appType.NumIn() != 1 {
-		panic("Must take an arguments struct")
-	}
+type AppPart interface {
+	appPart()
+}
 
-	argsType := appType.In(0)
-	return &cli.App{
-		Flags:  buildFlags(argsType),
-		Action: buildAction(app),
+type CommandWrapper cli.Command
+
+func (c CommandWrapper) appPart() {}
+
+type ActionFunction func(c *cli.Context) error
+
+func (a ActionFunction) appPart() {}
+
+func Command[Args any](name string, action func(Args) error) CommandWrapper {
+	return CommandWrapper(cli.Command{
+		Name:   name,
+		Flags:  buildFlags(reflect.TypeOf(*new(Args))),
+		Action: buildAction(action),
+	})
+}
+
+func Group(name string, parts ...AppPart) (cmd CommandWrapper) {
+	cmd.Name = name
+	for _, p := range parts {
+		switch p := p.(type) {
+		case CommandWrapper:
+			cmd.Subcommands = append(cmd.Subcommands, cli.Command(p))
+		case ActionFunction:
+			panic("Groups can't contain action functions!")
+		case UsageWrapper:
+			cmd.Usage = string(p)
+		}
 	}
+	return
+}
+
+func Action[Args any](action func(Args) error) ActionFunction {
+	return buildAction(action)
+}
+
+type UsageWrapper string
+
+func (u UsageWrapper) appPart() {}
+func Usage(usage string) UsageWrapper {
+	return UsageWrapper(usage)
+}
+
+func App(name string, parts ...AppPart) (app *cli.App) {
+	app = &cli.App{}
+	app.Name = name
+	for _, p := range parts {
+		switch p := p.(type) {
+		case CommandWrapper:
+			app.Commands = append(app.Commands, cli.Command(p))
+		case ActionFunction:
+			app.Action = p
+		case UsageWrapper:
+			app.Usage = string(p)
+		}
+	}
+	return
 }
