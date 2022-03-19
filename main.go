@@ -8,8 +8,13 @@ import (
 	"github.com/tmr232/goat/goat"
 )
 
+type BaseArgs struct {
+	Flag goat.Optional[bool]
+}
+
 type HelloArgs struct {
-	Name goat.Optional[string] `goat:"name"`
+	BaseArgs `embed:""`
+	Name     goat.Optional[string] `name:"name"`
 }
 
 func Hello(args HelloArgs) error {
@@ -18,7 +23,7 @@ func Hello(args HelloArgs) error {
 }
 
 type GoodbyeArgs struct {
-	Name string `goat:"name" usage:"the name to say goodbye to"`
+	Name string `name:"name" usage:"the name to say goodbye to"`
 }
 
 func Goodbye(args GoodbyeArgs) error {

@@ -29,7 +29,7 @@ func Value[T any](value T) Optional[T] {
 
 func makeFlag(field reflect.StructField) cli.Flag {
 	name := field.Name
-	alias, hasAlias := field.Tag.Lookup("goat")
+	alias, hasAlias := field.Tag.Lookup("name")
 	if hasAlias {
 		name = alias
 	}
@@ -81,7 +81,12 @@ func buildFlags(argsType reflect.Type) (flags []cli.Flag) {
 
 	for i := 0; i < argsType.NumField(); i++ {
 		field := argsType.Field(i)
-		flags = append(flags, makeFlag(field))
+		_, embed := field.Tag.Lookup("embed")
+		if embed {
+			flags = append(flags, buildFlags(field.Type)...)
+		} else {
+			flags = append(flags, makeFlag(field))
+		}
 	}
 	return
 }
