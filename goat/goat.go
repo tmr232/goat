@@ -210,9 +210,12 @@ type CommandWrapper cli.Command
 
 func (c CommandWrapper) appPart() {}
 
-type ActionFunction func(c *cli.Context) error
+type ActionWrapper struct {
+	action func(c *cli.Context) error
+	flags  []cli.Flag
+}
 
-func (a ActionFunction) appPart() {}
+func (a ActionWrapper) appPart() {}
 
 func Command[Args any](name string, action func(Args) error, parts ...AppPart) CommandWrapper {
 	cmd := CommandWrapper(cli.Command{
@@ -236,7 +239,7 @@ func Group(name string, parts ...AppPart) (cmd CommandWrapper) {
 		switch p := p.(type) {
 		case CommandWrapper:
 			cmd.Subcommands = append(cmd.Subcommands, cli.Command(p))
-		case ActionFunction:
+		case ActionWrapper:
 			panic("Groups can't contain action functions!")
 		case UsageWrapper:
 			cmd.Usage = string(p)
@@ -245,8 +248,11 @@ func Group(name string, parts ...AppPart) (cmd CommandWrapper) {
 	return
 }
 
-func Action[Args any](action func(Args) error) ActionFunction {
-	return buildAction(action)
+func Action[Args any](action func(Args) error) ActionWrapper {
+	return ActionWrapper{
+		action: buildAction(action),
+		flags:  buildFlags(reflect.TypeOf(*new(Args))),
+	}
 }
 
 type UsageWrapper string
@@ -263,8 +269,9 @@ func App(name string, parts ...AppPart) (app *cli.App) {
 		switch p := p.(type) {
 		case CommandWrapper:
 			app.Commands = append(app.Commands, cli.Command(p))
-		case ActionFunction:
-			app.Action = p
+		case ActionWrapper:
+			app.Action = p.action
+			app.Flags = p.flags
 		case UsageWrapper:
 			app.Usage = string(p)
 		}
