@@ -11,6 +11,14 @@ type Optional[T any] struct {
 	Value    T
 }
 
+type baseTypeGetter interface {
+	baseType() reflect.Type
+}
+
+func (o Optional[T]) baseType() reflect.Type {
+	return reflect.TypeOf(o.Value)
+}
+
 func Empty[T any]() Optional[T] {
 	return Optional[T]{}
 }
@@ -25,18 +33,42 @@ func makeFlag(field reflect.StructField) cli.Flag {
 	if hasAlias {
 		name = alias
 	}
-	switch field.Type.Kind() {
-	case reflect.Bool:
-		return &cli.BoolFlag{Name: name, Required: true}
-	case reflect.String:
-		return &cli.StringFlag{Name: name, Required: true}
+	usage := field.Tag.Get("usage")
+
+	required := true
+
+	fieldType := field.Type
+
+	typeGetter, isOptional := reflect.New(fieldType).Elem().Interface().(baseTypeGetter)
+	if isOptional {
+		fieldType = typeGetter.baseType()
+		required = false
 	}
 
-	switch field.Type {
-	case reflect.TypeOf(Optional[bool]{}):
-		return &cli.BoolFlag{Name: name}
-	case reflect.TypeOf(Optional[string]{}):
-		return &cli.StringFlag{Name: name}
+	switch fieldType.Kind() {
+	case reflect.Bool:
+		return &cli.BoolFlag{Name: name, Required: required, Usage: usage}
+	case reflect.String:
+		return &cli.StringFlag{Name: name, Required: required, Usage: usage}
+	case reflect.Int:
+		return &cli.IntFlag{Name: name, Required: required, Usage: usage}
+	case reflect.Int64:
+		return &cli.Int64Flag{Name: name, Required: required, Usage: usage}
+	case reflect.Uint:
+		return &cli.UintFlag{Name: name, Required: required, Usage: usage}
+	case reflect.Uint64:
+		return &cli.Uint64Flag{Name: name, Required: required, Usage: usage}
+	case reflect.Float64:
+		return &cli.Float64Flag{Name: name, Required: required, Usage: usage}
+	case reflect.Slice:
+		switch fieldType.Elem().Kind() {
+		case reflect.String:
+			return &cli.StringSliceFlag{Name: name, Required: required, Usage: usage}
+		case reflect.Int:
+			return &cli.IntSliceFlag{Name: name, Required: required, Usage: usage}
+		case reflect.Int64:
+			return &cli.Int64SliceFlag{Name: name, Required: required, Usage: usage}
+		}
 	}
 
 	panic("Unsupported type!")
@@ -54,32 +86,63 @@ func buildFlags(argsType reflect.Type) (flags []cli.Flag) {
 	return
 }
 
+func wrapValue[T any](value T, optional bool) any {
+	if optional {
+		return Value(value)
+	}
+	return value
+}
+
 func getField(c *cli.Context, field reflect.StructField) (any, bool) {
 	name := field.Name
 	alias, hasAlias := field.Tag.Lookup("goat")
 	if hasAlias {
 		name = alias
 	}
-	switch field.Type.Kind() {
-	case reflect.Bool:
-		return c.Bool(name), true
-	case reflect.String:
-		return c.String(name), true
+
+	fieldType := field.Type
+
+	required := false
+
+	typeGetter, isOptional := reflect.New(fieldType).Elem().Interface().(baseTypeGetter)
+	if isOptional {
+		fieldType = typeGetter.baseType()
+		required = false
 	}
 
-	switch field.Type {
-	case reflect.TypeOf(Optional[bool]{}):
-		if c.IsSet(name) {
-			return Value(c.Bool(name)), true
+	var getFlag func(name string) any
+
+	switch fieldType.Kind() {
+	case reflect.Bool:
+		getFlag = func(name string) any { return wrapValue(c.Bool(name), isOptional) }
+	case reflect.String:
+		getFlag = func(name string) any { return wrapValue(c.String(name), isOptional) }
+	case reflect.Int:
+		getFlag = func(name string) any { return wrapValue(c.Int(name), isOptional) }
+	case reflect.Int64:
+		getFlag = func(name string) any { return wrapValue(c.Int64(name), isOptional) }
+	case reflect.Uint:
+		getFlag = func(name string) any { return wrapValue(c.Uint(name), isOptional) }
+	case reflect.Uint64:
+		getFlag = func(name string) any { return wrapValue(c.Uint64(name), isOptional) }
+	case reflect.Float64:
+		getFlag = func(name string) any { return wrapValue(c.Float64(name), isOptional) }
+	case reflect.Slice:
+		switch fieldType.Elem().Kind() {
+		case reflect.String:
+			getFlag = func(name string) any { return wrapValue(c.StringSlice(name), isOptional) }
+		case reflect.Int:
+			getFlag = func(name string) any { return wrapValue(c.IntSlice(name), isOptional) }
+		case reflect.Int64:
+			getFlag = func(name string) any { return wrapValue(c.Int64Slice(name), isOptional) }
 		}
-		return nil, false
-	case reflect.TypeOf(Optional[string]{}):
-		if c.IsSet(name) {
-			return Value(c.String(name)), true
-		}
-		return nil, false
 	}
-	panic("Invalid field type")
+
+	if required || c.IsSet(name) {
+		return getFlag(name), true
+	}
+
+	return nil, false
 }
 
 func buildAction[Args any](action func(Args) error) func(c *cli.Context) error {
@@ -125,12 +188,20 @@ type ActionFunction func(c *cli.Context) error
 
 func (a ActionFunction) appPart() {}
 
-func Command[Args any](name string, action func(Args) error) CommandWrapper {
-	return CommandWrapper(cli.Command{
+func Command[Args any](name string, action func(Args) error, parts ...AppPart) CommandWrapper {
+	cmd := CommandWrapper(cli.Command{
 		Name:   name,
 		Flags:  buildFlags(reflect.TypeOf(*new(Args))),
 		Action: buildAction(action),
 	})
+
+	for _, p := range parts {
+		switch p := p.(type) {
+		case UsageWrapper:
+			cmd.Usage = string(p)
+		}
+	}
+	return cmd
 }
 
 func Group(name string, parts ...AppPart) (cmd CommandWrapper) {

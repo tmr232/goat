@@ -9,7 +9,7 @@ import (
 )
 
 type HelloArgs struct {
-	Name string `goat:"name"`
+	Name goat.Optional[string] `goat:"name"`
 }
 
 func Hello(args HelloArgs) error {
@@ -18,7 +18,7 @@ func Hello(args HelloArgs) error {
 }
 
 type GoodbyeArgs struct {
-	Name string `goat:"name"`
+	Name string `goat:"name" usage:"the name to say goodbye to"`
 }
 
 func Goodbye(args GoodbyeArgs) error {
@@ -30,11 +30,13 @@ func main() {
 	app := goat.App(
 		"hello-world",
 		goat.Command("hello", Hello),
-		goat.Command("goodbye", Goodbye),
+		goat.Command("goodbye", Goodbye, goat.Usage("Says goodbye.")),
 		goat.Group("say",
 			goat.Command("hello", Hello),
 			goat.Command("goodbye", Goodbye),
+			goat.Usage("Says many things."),
 		),
+		goat.Usage("Greets things & people."),
 	)
 
 	err := app.Run(os.Args)
