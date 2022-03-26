@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/tmr232/goat/goat"
+	"github.com/tmr232/goat/goat/cli"
 	"log"
 	"os"
 )
@@ -13,7 +14,7 @@ type BaseArgs struct {
 
 type HelloArgs struct {
 	BaseArgs
-	Name *string `name:"name"`
+	Name *string `alias:"name"`
 }
 
 type HelloError string
@@ -49,7 +50,7 @@ func main() {
 		),
 	)
 
-	err := app.Run(os.Args)
+	err := cli.MakeCliApp(app).Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
