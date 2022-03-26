@@ -104,52 +104,54 @@ func setArgs(argsValue reflect.Value, flags []goat.Flag, c *cli.Context) {
 	for _, flag := range flags {
 		value, isSet := getArg(c, flag)
 		if isSet {
-			argsValue.FieldByName(flag.ArgName()).Set(reflect.ValueOf(value))
+			argsValue.FieldByName(flag.ArgName()).Set(value)
 		}
 	}
 }
 
-func getArg(c *cli.Context, flag goat.Flag) (any, bool) {
-	name := flag.Name
+func asValue[T any](value T, asPointer bool) reflect.Value {
+	if asPointer {
+		return reflect.ValueOf(&value)
+	}
+	return reflect.ValueOf(value)
+}
+
+func getArg(c *cli.Context, flag goat.Flag) (reflect.Value, bool) {
+	name := flag.DisplayName()
 	isPointer := !flag.Required
 
-	var getFlag func(name string) any
-
-	switch flag.Type.Kind() {
-	case reflect.Bool:
-		getFlag = func(name string) any { return wrapValue(c.Bool(name), isPointer) }
-	case reflect.String:
-		getFlag = func(name string) any { return wrapValue(c.String(name), isPointer) }
-	case reflect.Int:
-		getFlag = func(name string) any { return wrapValue(c.Int(name), isPointer) }
-	case reflect.Int64:
-		getFlag = func(name string) any { return wrapValue(c.Int64(name), isPointer) }
-	case reflect.Uint:
-		getFlag = func(name string) any { return wrapValue(c.Uint(name), isPointer) }
-	case reflect.Uint64:
-		getFlag = func(name string) any { return wrapValue(c.Uint64(name), isPointer) }
-	case reflect.Float64:
-		getFlag = func(name string) any { return wrapValue(c.Float64(name), isPointer) }
-	case reflect.Slice:
-		switch flag.Type.Elem().Kind() {
+	getFlag := func() reflect.Value {
+		switch flag.Type.Kind() {
+		case reflect.Bool:
+			return asValue(c.Bool(name), isPointer)
 		case reflect.String:
-			getFlag = func(name string) any { return wrapValue(c.StringSlice(name), isPointer) }
+			return asValue(c.String(name), isPointer)
 		case reflect.Int:
-			getFlag = func(name string) any { return wrapValue(c.IntSlice(name), isPointer) }
+			return asValue(c.Int(name), isPointer)
 		case reflect.Int64:
-			getFlag = func(name string) any { return wrapValue(c.Int64Slice(name), isPointer) }
+			return asValue(c.Int64(name), isPointer)
+		case reflect.Uint:
+			return asValue(c.Uint(name), isPointer)
+		case reflect.Uint64:
+			return asValue(c.Uint64(name), isPointer)
+		case reflect.Float64:
+			return asValue(c.Float64(name), isPointer)
+		case reflect.Slice:
+			switch flag.Type.Elem().Kind() {
+			case reflect.String:
+				return asValue(c.StringSlice(name), isPointer)
+			case reflect.Int:
+				return asValue(c.IntSlice(name), isPointer)
+			case reflect.Int64:
+				return asValue(c.Int64Slice(name), isPointer)
+			}
 		}
+		panic("Why are we here?")
 	}
 
 	if flag.Required || c.IsSet(name) {
-		return getFlag(name), true
+		return getFlag(), true
 	}
 
-	return nil, false
-}
-func wrapValue[T any](value T, isPointer bool) any {
-	if isPointer {
-		return &value
-	}
-	return value
+	return reflect.ValueOf(nil), false
 }

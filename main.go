@@ -24,7 +24,11 @@ func (h HelloError) Error() string {
 }
 
 func Hello(args HelloArgs) error {
-	fmt.Println("Hello ", args.Name, args.Flag)
+	name := "<missing>"
+	if args.Name != nil {
+		name = *args.Name
+	}
+	fmt.Println("Hello ", name, args.Flag)
 	return HelloError("Error!!!")
 }
 
