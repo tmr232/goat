@@ -45,7 +45,9 @@ func main() {
 	app := goat.App(
 		"hello-world",
 		goat.Usage("Greets things & people."),
-		goat.Command("hello", Hello),
+		goat.Command("hello", Hello,
+			goat.With(
+				goat.Arg{Name: "Flag", Alias: "ffflag", Usage: "This is how you use a flag!"})),
 		goat.Command("goodbye", Goodbye, goat.Usage("Says goodbye.")),
 		goat.Group("say",
 			goat.Usage("Says many things."),

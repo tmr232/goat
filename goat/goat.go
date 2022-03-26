@@ -19,18 +19,23 @@ func (g GoatCommandGroup) appPart()  {}
 func (a GoatAction) appPart()        {}
 func (u UsageWrapper) appPart()      {}
 
-func Command[Args any](name string, action func(Args) error, parts ...AppPart) GoatCommandSingle {
+func Command[Args any](name string, action func(Args) error, parts ...CommandPart) GoatCommandSingle {
 	cmd := GoatCommandSingle{
-		Name:   name,
-		Action: Action(action),
+		Name: name,
 	}
 
+	var args ArgMap
 	for _, p := range parts {
 		switch p := p.(type) {
 		case UsageWrapper:
 			cmd.Usage = string(p)
+		case ArgMap:
+			args = p
 		}
 	}
+
+	cmd.Action = actionWithArgs(action, args)
+
 	return cmd
 }
 
@@ -49,17 +54,26 @@ func Group(name string, parts ...AppPart) GoatCommandGroup {
 	return cmd
 }
 
-func Flags(argsType reflect.Type) (flags []Flag) {
+func Flags(argsType reflect.Type, args ArgMap) (flags []Flag) {
 	for i := 0; i < argsType.NumField(); i++ {
 		field := argsType.Field(i)
 
 		if shouldEmbed(field.Type) {
-			flags = append(flags, Flags(field.Type)...)
+			flags = append(flags, Flags(field.Type, args)...)
 		} else {
 			name := field.Name
-			alias := field.Tag.Get("alias")
-			usage := field.Tag.Get("usage")
 
+			var alias string
+			var usage string
+
+			arg, hasArg := args[name]
+			if hasArg {
+				alias = arg.Alias
+				usage = arg.Usage
+			} else {
+				alias = field.Tag.Get("alias")
+				usage = field.Tag.Get("usage")
+			}
 			required := true
 			fieldType := field.Type
 			if fieldType.Kind() == reflect.Pointer {
@@ -81,10 +95,14 @@ func Flags(argsType reflect.Type) (flags []Flag) {
 }
 
 func Action[Args any](action func(Args) error) GoatAction {
+	return actionWithArgs(action, nil)
+}
+
+func actionWithArgs[Args any](action func(Args) error, args ArgMap) GoatAction {
 	return GoatAction{
 		ActionValue: reflect.ValueOf(action),
 		ArgsType:    reflect.TypeOf(action).In(0),
-		Flags:       Flags(reflect.TypeOf(action).In(0)),
+		Flags:       Flags(reflect.TypeOf(action).In(0), args),
 	}
 }
 
@@ -158,4 +176,27 @@ func (g GoatCommandSingle) goatCommand() {}
 
 func shouldEmbed(fieldType reflect.Type) bool {
 	return fieldType.Kind() == reflect.Struct
+}
+
+type Arg struct {
+	Name  string
+	Alias string
+	Usage string
+}
+
+type ArgMap map[string]Arg
+
+type CommandPart interface {
+	commandPart()
+}
+
+func (a ArgMap) commandPart()       {}
+func (u UsageWrapper) commandPart() {}
+
+func With(args ...Arg) ArgMap {
+	argMap := make(map[string]Arg)
+	for _, arg := range args {
+		argMap[arg.Name] = arg
+	}
+	return argMap
 }
