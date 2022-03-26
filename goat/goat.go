@@ -6,27 +6,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-type Optional[T any] struct {
-	HasValue bool
-	Value    T
-}
-
-type baseTypeGetter interface {
-	baseType() reflect.Type
-}
-
-func (o Optional[T]) baseType() reflect.Type {
-	return reflect.TypeOf(o.Value)
-}
-
-func Empty[T any]() Optional[T] {
-	return Optional[T]{}
-}
-
-func Value[T any](value T) Optional[T] {
-	return Optional[T]{Value: value, HasValue: true}
-}
-
 func makeFlag(field reflect.StructField) cli.Flag {
 	name := field.Name
 	alias, hasAlias := field.Tag.Lookup("name")
@@ -39,9 +18,8 @@ func makeFlag(field reflect.StructField) cli.Flag {
 
 	fieldType := field.Type
 
-	typeGetter, isOptional := reflect.New(fieldType).Elem().Interface().(baseTypeGetter)
-	if isOptional {
-		fieldType = typeGetter.baseType()
+	if fieldType.Kind() == reflect.Pointer {
+		fieldType = fieldType.Elem()
 		required = false
 	}
 
@@ -74,18 +52,8 @@ func makeFlag(field reflect.StructField) cli.Flag {
 	panic("Unsupported type!")
 }
 
-type isGoatType interface {
-	isGoatType()
-}
-
-func (o Optional[T]) isGoatType() {}
-
 func shouldEmbed(fieldType reflect.Type) bool {
-	if fieldType.Kind() != reflect.Struct {
-		return false
-	}
-	_, isGoatType := reflect.New(fieldType).Elem().Interface().(isGoatType)
-	return !isGoatType
+	return fieldType.Kind() == reflect.Struct
 }
 
 func buildFlags(argsType reflect.Type) (flags []cli.Flag) {
@@ -104,9 +72,9 @@ func buildFlags(argsType reflect.Type) (flags []cli.Flag) {
 	return
 }
 
-func wrapValue[T any](value T, optional bool) any {
-	if optional {
-		return Value(value)
+func wrapValue[T any](value T, isPointer bool) any {
+	if isPointer {
+		return &value
 	}
 	return value
 }
@@ -122,37 +90,36 @@ func getField(c *cli.Context, field reflect.StructField) (any, bool) {
 
 	required := false
 
-	typeGetter, isOptional := reflect.New(fieldType).Elem().Interface().(baseTypeGetter)
-	if isOptional {
-		fieldType = typeGetter.baseType()
+	if fieldType.Kind() == reflect.Pointer {
+		fieldType = fieldType.Elem()
 		required = false
 	}
-
+	isPointer := !required
 	var getFlag func(name string) any
 
 	switch fieldType.Kind() {
 	case reflect.Bool:
-		getFlag = func(name string) any { return wrapValue(c.Bool(name), isOptional) }
+		getFlag = func(name string) any { return wrapValue(c.Bool(name), isPointer) }
 	case reflect.String:
-		getFlag = func(name string) any { return wrapValue(c.String(name), isOptional) }
+		getFlag = func(name string) any { return wrapValue(c.String(name), isPointer) }
 	case reflect.Int:
-		getFlag = func(name string) any { return wrapValue(c.Int(name), isOptional) }
+		getFlag = func(name string) any { return wrapValue(c.Int(name), isPointer) }
 	case reflect.Int64:
-		getFlag = func(name string) any { return wrapValue(c.Int64(name), isOptional) }
+		getFlag = func(name string) any { return wrapValue(c.Int64(name), isPointer) }
 	case reflect.Uint:
-		getFlag = func(name string) any { return wrapValue(c.Uint(name), isOptional) }
+		getFlag = func(name string) any { return wrapValue(c.Uint(name), isPointer) }
 	case reflect.Uint64:
-		getFlag = func(name string) any { return wrapValue(c.Uint64(name), isOptional) }
+		getFlag = func(name string) any { return wrapValue(c.Uint64(name), isPointer) }
 	case reflect.Float64:
-		getFlag = func(name string) any { return wrapValue(c.Float64(name), isOptional) }
+		getFlag = func(name string) any { return wrapValue(c.Float64(name), isPointer) }
 	case reflect.Slice:
 		switch fieldType.Elem().Kind() {
 		case reflect.String:
-			getFlag = func(name string) any { return wrapValue(c.StringSlice(name), isOptional) }
+			getFlag = func(name string) any { return wrapValue(c.StringSlice(name), isPointer) }
 		case reflect.Int:
-			getFlag = func(name string) any { return wrapValue(c.IntSlice(name), isOptional) }
+			getFlag = func(name string) any { return wrapValue(c.IntSlice(name), isPointer) }
 		case reflect.Int64:
-			getFlag = func(name string) any { return wrapValue(c.Int64Slice(name), isOptional) }
+			getFlag = func(name string) any { return wrapValue(c.Int64Slice(name), isPointer) }
 		}
 	}
 
@@ -190,32 +157,40 @@ func buildAction[Args any](action func(Args) error) func(c *cli.Context) error {
 	}
 
 	actionFunc := func(c *cli.Context) error {
-		var args Args
 
-		argsValue := reflect.ValueOf(&args).Elem()
-
+		argsValue := reflect.New(actionType.In(0)).Elem()
 		setArgs(argsValue, c)
-
-		return action(args)
+		actionValue := reflect.ValueOf(action)
+		ret := actionValue.Call([]reflect.Value{argsValue})[0].Interface()
+		if ret != nil {
+			return ret.(error)
+		}
+		return nil
 	}
 
 	return actionFunc
 }
 
-type AppPart interface {
-	appPart()
-}
-
 type CommandWrapper cli.Command
-
-func (c CommandWrapper) appPart() {}
 
 type ActionWrapper struct {
 	action func(c *cli.Context) error
 	flags  []cli.Flag
 }
 
-func (a ActionWrapper) appPart() {}
+type UsageWrapper string
+
+func Usage(usage string) UsageWrapper {
+	return UsageWrapper(usage)
+}
+
+type AppPart interface {
+	appPart()
+}
+
+func (c CommandWrapper) appPart() {}
+func (a ActionWrapper) appPart()  {}
+func (u UsageWrapper) appPart()   {}
 
 func Command[Args any](name string, action func(Args) error, parts ...AppPart) CommandWrapper {
 	cmd := CommandWrapper(cli.Command{
@@ -247,19 +222,11 @@ func Group(name string, parts ...AppPart) (cmd CommandWrapper) {
 	}
 	return
 }
-
 func Action[Args any](action func(Args) error) ActionWrapper {
 	return ActionWrapper{
 		action: buildAction(action),
 		flags:  buildFlags(reflect.TypeOf(*new(Args))),
 	}
-}
-
-type UsageWrapper string
-
-func (u UsageWrapper) appPart() {}
-func Usage(usage string) UsageWrapper {
-	return UsageWrapper(usage)
 }
 
 func App(name string, parts ...AppPart) (app *cli.App) {

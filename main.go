@@ -2,24 +2,29 @@ package main
 
 import (
 	"fmt"
+	"github.com/tmr232/goat/goat"
 	"log"
 	"os"
-
-	"github.com/tmr232/goat/goat"
 )
 
 type BaseArgs struct {
-	Flag goat.Optional[bool]
+	Flag *bool
 }
 
 type HelloArgs struct {
 	BaseArgs
-	Name goat.Optional[string] `name:"name"`
+	Name *string `name:"name"`
+}
+
+type HelloError string
+
+func (h HelloError) Error() string {
+	return string(h)
 }
 
 func Hello(args HelloArgs) error {
-	fmt.Println("Hello ", args.Name, args.Flag.Value)
-	return nil
+	fmt.Println("Hello ", args.Name, args.Flag)
+	return HelloError("Error!!!")
 }
 
 type GoodbyeArgs struct {
