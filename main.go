@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/tmr232/goat/goat"
-	"github.com/tmr232/goat/goat/cli"
 	"log"
 	"os"
+
+	"github.com/tmr232/goat/goat"
+	"github.com/tmr232/goat/goat/cli"
 )
 
 type BaseArgs struct {

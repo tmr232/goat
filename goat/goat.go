@@ -150,10 +150,35 @@ func (f Flag) ArgName() string {
 	return f.Name
 }
 
+type FlagGetter interface {
+	GetFlag(flag Flag) (value reflect.Value, isSet bool)
+}
+
 type GoatAction struct {
 	ActionValue reflect.Value
 	ArgsType    reflect.Type
 	Flags       []Flag
+}
+
+func (action *GoatAction) Call(flagGetter FlagGetter) error {
+	argsValue := reflect.New(action.ArgsType).Elem()
+	for _, flag := range action.Flags {
+		value, isSet := flagGetter.GetFlag(flag)
+
+		if flag.Required {
+			argsValue.FieldByName(flag.Name).Set(value)
+		} else if isSet && !value.IsZero() {
+			ptr := reflect.New(value.Type())
+			ptr.Elem().Set(value)
+			argsValue.FieldByName(flag.Name).Set(ptr)
+		}
+	}
+	actionValue := action.ActionValue
+	ret := actionValue.Call([]reflect.Value{argsValue})[0].Interface()
+	if ret != nil {
+		return ret.(error)
+	}
+	return nil
 }
 
 type GoatCommand interface {
@@ -165,6 +190,7 @@ type GoatCommandGroup struct {
 	Usage       string
 	Subcommands []GoatCommand
 }
+
 type GoatCommandSingle struct {
 	Name   string
 	Usage  string

@@ -1,9 +1,10 @@
 package cli
 
 import (
+	"reflect"
+
 	"github.com/tmr232/goat/goat"
 	"github.com/urfave/cli"
-	"reflect"
 )
 
 func MakeCliApp(goatApp goat.GoatApp) *cli.App {
@@ -50,6 +51,7 @@ func makeCliFlags(action *goat.GoatAction) (flags []cli.Flag) {
 	}
 	return
 }
+
 func makeFlag(goatFlag goat.Flag) cli.Flag {
 	name := goatFlag.DisplayName()
 	usage := goatFlag.Usage
@@ -85,73 +87,51 @@ func makeFlag(goatFlag goat.Flag) cli.Flag {
 	panic("Unsupported type!")
 }
 
-func makeCliAction(goatAction *goat.GoatAction) cli.ActionFunc {
-	actionFunc := func(c *cli.Context) error {
-		argsValue := reflect.New(goatAction.ArgsType).Elem()
-		setArgs(argsValue, goatAction.Flags, c)
-		actionValue := goatAction.ActionValue
-		ret := actionValue.Call([]reflect.Value{argsValue})[0].Interface()
-		if ret != nil {
-			return ret.(error)
-		}
-		return nil
-	}
-
-	return actionFunc
+type _Context struct {
+	Context *cli.Context
 }
 
-func setArgs(argsValue reflect.Value, flags []goat.Flag, c *cli.Context) {
-	for _, flag := range flags {
-		value, isSet := getArg(c, flag)
-		if isSet {
-			argsValue.FieldByName(flag.ArgName()).Set(value)
-		}
-	}
-}
-
-func asValue[T any](value T, asPointer bool) reflect.Value {
-	if asPointer {
-		return reflect.ValueOf(&value)
-	}
-	return reflect.ValueOf(value)
-}
-
-func getArg(c *cli.Context, flag goat.Flag) (reflect.Value, bool) {
+func (context _Context) GetFlag(flag goat.Flag) (reflect.Value, bool) {
+	// Make this work with the custom type, and then we're mostly set!
+	c := context.Context
 	name := flag.DisplayName()
-	isPointer := !flag.Required
 
 	getFlag := func() reflect.Value {
 		switch flag.Type.Kind() {
 		case reflect.Bool:
-			return asValue(c.Bool(name), isPointer)
+			return reflect.ValueOf(c.Bool(name))
 		case reflect.String:
-			return asValue(c.String(name), isPointer)
+			return reflect.ValueOf(c.String(name))
 		case reflect.Int:
-			return asValue(c.Int(name), isPointer)
+			return reflect.ValueOf(c.Int(name))
 		case reflect.Int64:
-			return asValue(c.Int64(name), isPointer)
+			return reflect.ValueOf(c.Int64(name))
 		case reflect.Uint:
-			return asValue(c.Uint(name), isPointer)
+			return reflect.ValueOf(c.Uint(name))
 		case reflect.Uint64:
-			return asValue(c.Uint64(name), isPointer)
+			return reflect.ValueOf(c.Uint64(name))
 		case reflect.Float64:
-			return asValue(c.Float64(name), isPointer)
+			return reflect.ValueOf(c.Float64(name))
 		case reflect.Slice:
 			switch flag.Type.Elem().Kind() {
 			case reflect.String:
-				return asValue(c.StringSlice(name), isPointer)
+				return reflect.ValueOf(c.StringSlice(name))
 			case reflect.Int:
-				return asValue(c.IntSlice(name), isPointer)
+				return reflect.ValueOf(c.IntSlice(name))
 			case reflect.Int64:
-				return asValue(c.Int64Slice(name), isPointer)
+				return reflect.ValueOf(c.Int64Slice(name))
 			}
 		}
 		panic("Why are we here?")
 	}
 
-	if flag.Required || c.IsSet(name) {
-		return getFlag(), true
+	return getFlag(), c.IsSet(name)
+}
+
+func makeCliAction(goatAction *goat.GoatAction) cli.ActionFunc {
+	actionFunc := func(c *cli.Context) error {
+		return goatAction.Call(_Context{c})
 	}
 
-	return reflect.ValueOf(nil), false
+	return actionFunc
 }
