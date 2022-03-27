@@ -85,7 +85,7 @@ func Flags(argsType reflect.Type, args ArgMap) (flags []Flag) {
 				Name:     name,
 				Alias:    alias,
 				Usage:    usage,
-				Type:     fieldType,
+				Type:     getFlagType(fieldType),
 				Required: required,
 			}
 			flags = append(flags, flag)
@@ -131,11 +131,55 @@ type GoatApp struct {
 	Commands []GoatCommand
 }
 
+type FlagType uint
+
+const (
+	Bool FlagType = iota
+	String
+	Int
+	Int64
+	Uint
+	Uint64
+	Float64
+	StringSlice
+	IntSlice
+	Int64Slice
+)
+
+func getFlagType(p reflect.Type) FlagType {
+	switch p.Kind() {
+	case reflect.Bool:
+		return Bool
+	case reflect.String:
+		return String
+	case reflect.Int:
+		return Int
+	case reflect.Int64:
+		return Int64
+	case reflect.Uint:
+		return Uint
+	case reflect.Uint64:
+		return Uint64
+	case reflect.Float64:
+		return Float64
+	case reflect.Slice:
+		switch p.Elem().Kind() {
+		case reflect.String:
+			return StringSlice
+		case reflect.Int:
+			return IntSlice
+		case reflect.Int64:
+			return Int64Slice
+		}
+	}
+	panic("Unsupported flag type!")
+}
+
 type Flag struct {
 	Name     string
 	Alias    string
 	Usage    string
-	Type     reflect.Type
+	Type     FlagType
 	Required bool
 }
 
@@ -151,7 +195,7 @@ func (f Flag) ArgName() string {
 }
 
 type FlagGetter interface {
-	GetFlag(flag Flag) (value reflect.Value, isSet bool)
+	GetFlag(flag Flag) (value any, isSet bool)
 }
 
 type GoatAction struct {
@@ -164,12 +208,12 @@ func (action *GoatAction) Call(flagGetter FlagGetter) error {
 	argsValue := reflect.New(action.ArgsType).Elem()
 	for _, flag := range action.Flags {
 		value, isSet := flagGetter.GetFlag(flag)
-
+		valueValue := reflect.ValueOf(value)
 		if flag.Required {
-			argsValue.FieldByName(flag.Name).Set(value)
-		} else if isSet && !value.IsZero() {
-			ptr := reflect.New(value.Type())
-			ptr.Elem().Set(value)
+			argsValue.FieldByName(flag.Name).Set(valueValue)
+		} else if isSet && !valueValue.IsZero() {
+			ptr := reflect.New(valueValue.Type())
+			ptr.Elem().Set(valueValue)
 			argsValue.FieldByName(flag.Name).Set(ptr)
 		}
 	}

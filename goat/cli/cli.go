@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"reflect"
-
 	"github.com/tmr232/goat/goat"
 	"github.com/urfave/cli"
 )
@@ -56,32 +54,28 @@ func makeFlag(goatFlag goat.Flag) cli.Flag {
 	name := goatFlag.DisplayName()
 	usage := goatFlag.Usage
 	required := goatFlag.Required
-	fieldType := goatFlag.Type
 
-	switch fieldType.Kind() {
-	case reflect.Bool:
+	switch goatFlag.Type {
+	case goat.Bool:
 		return &cli.BoolFlag{Name: name, Required: required, Usage: usage}
-	case reflect.String:
+	case goat.String:
 		return &cli.StringFlag{Name: name, Required: required, Usage: usage}
-	case reflect.Int:
+	case goat.Int:
 		return &cli.IntFlag{Name: name, Required: required, Usage: usage}
-	case reflect.Int64:
+	case goat.Int64:
 		return &cli.Int64Flag{Name: name, Required: required, Usage: usage}
-	case reflect.Uint:
+	case goat.Uint:
 		return &cli.UintFlag{Name: name, Required: required, Usage: usage}
-	case reflect.Uint64:
+	case goat.Uint64:
 		return &cli.Uint64Flag{Name: name, Required: required, Usage: usage}
-	case reflect.Float64:
+	case goat.Float64:
 		return &cli.Float64Flag{Name: name, Required: required, Usage: usage}
-	case reflect.Slice:
-		switch fieldType.Elem().Kind() {
-		case reflect.String:
-			return &cli.StringSliceFlag{Name: name, Required: required, Usage: usage}
-		case reflect.Int:
-			return &cli.IntSliceFlag{Name: name, Required: required, Usage: usage}
-		case reflect.Int64:
-			return &cli.Int64SliceFlag{Name: name, Required: required, Usage: usage}
-		}
+	case goat.StringSlice:
+		return &cli.StringSliceFlag{Name: name, Required: required, Usage: usage}
+	case goat.IntSlice:
+		return &cli.IntSliceFlag{Name: name, Required: required, Usage: usage}
+	case goat.Int64Slice:
+		return &cli.Int64SliceFlag{Name: name, Required: required, Usage: usage}
 	}
 
 	panic("Unsupported type!")
@@ -91,36 +85,33 @@ type _Context struct {
 	Context *cli.Context
 }
 
-func (context _Context) GetFlag(flag goat.Flag) (reflect.Value, bool) {
+func (context _Context) GetFlag(flag goat.Flag) (any, bool) {
 	// Make this work with the custom type, and then we're mostly set!
 	c := context.Context
 	name := flag.DisplayName()
 
-	getFlag := func() reflect.Value {
-		switch flag.Type.Kind() {
-		case reflect.Bool:
-			return reflect.ValueOf(c.Bool(name))
-		case reflect.String:
-			return reflect.ValueOf(c.String(name))
-		case reflect.Int:
-			return reflect.ValueOf(c.Int(name))
-		case reflect.Int64:
-			return reflect.ValueOf(c.Int64(name))
-		case reflect.Uint:
-			return reflect.ValueOf(c.Uint(name))
-		case reflect.Uint64:
-			return reflect.ValueOf(c.Uint64(name))
-		case reflect.Float64:
-			return reflect.ValueOf(c.Float64(name))
-		case reflect.Slice:
-			switch flag.Type.Elem().Kind() {
-			case reflect.String:
-				return reflect.ValueOf(c.StringSlice(name))
-			case reflect.Int:
-				return reflect.ValueOf(c.IntSlice(name))
-			case reflect.Int64:
-				return reflect.ValueOf(c.Int64Slice(name))
-			}
+	getFlag := func() any {
+		switch flag.Type {
+		case goat.Bool:
+			return c.Bool(name)
+		case goat.String:
+			return c.String(name)
+		case goat.Int:
+			return c.Int(name)
+		case goat.Int64:
+			return c.Int64(name)
+		case goat.Uint:
+			return c.Uint(name)
+		case goat.Uint64:
+			return c.Uint64(name)
+		case goat.Float64:
+			return c.Float64(name)
+		case goat.StringSlice:
+			return c.StringSlice(name)
+		case goat.IntSlice:
+			return c.IntSlice(name)
+		case goat.Int64Slice:
+			return c.Int64Slice(name)
 		}
 		panic("Why are we here?")
 	}
