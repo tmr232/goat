@@ -1,129 +1,272 @@
 package goat
 
 import (
-	"github.com/urfave/cli"
 	"reflect"
 )
 
-type Optional[T any] struct {
-	HasValue bool
-	Value    T
+type UsageWrapper string
+
+func Usage(usage string) UsageWrapper {
+	return UsageWrapper(usage)
 }
 
-func Empty[T any]() Optional[T] {
-	return Optional[T]{}
+type AppPart interface {
+	appPart()
 }
 
-func Value[T any](value T) Optional[T] {
-	return Optional[T]{Value: value, HasValue: true}
+func (g GoatCommandSingle) appPart() {}
+func (g GoatCommandGroup) appPart()  {}
+func (a GoatAction) appPart()        {}
+func (u UsageWrapper) appPart()      {}
+
+func Command[Args any](name string, action func(Args) error, parts ...CommandPart) GoatCommandSingle {
+	cmd := GoatCommandSingle{
+		Name: name,
+	}
+
+	var args ArgMap
+	for _, p := range parts {
+		switch p := p.(type) {
+		case UsageWrapper:
+			cmd.Usage = string(p)
+		case ArgMap:
+			args = p
+		}
+	}
+
+	cmd.Action = actionWithArgs(action, args)
+
+	return cmd
 }
 
-func makeFlag(field reflect.StructField) cli.Flag {
-	name := field.Name
-	alias, hasAlias := field.Tag.Lookup("goat")
-	if hasAlias {
-		name = alias
+func Group(name string, parts ...AppPart) GoatCommandGroup {
+	cmd := GoatCommandGroup{
+		Name: name,
 	}
-	switch field.Type.Kind() {
-	case reflect.Bool:
-		return &cli.BoolFlag{Name: name, Required: true}
-	case reflect.String:
-		return &cli.StringFlag{Name: name, Required: true}
+	for _, p := range parts {
+		switch p := p.(type) {
+		case GoatCommand:
+			cmd.Subcommands = append(cmd.Subcommands, p)
+		case UsageWrapper:
+			cmd.Usage = string(p)
+		}
 	}
-
-	switch field.Type {
-	case reflect.TypeOf(Optional[bool]{}):
-		return &cli.BoolFlag{Name: name}
-	case reflect.TypeOf(Optional[string]{}):
-		return &cli.StringFlag{Name: name}
-	}
-
-	panic("Unsupported type!")
+	return cmd
 }
 
-func buildFlags(argsType reflect.Type) (flags []cli.Flag) {
-	if argsType.Kind() != reflect.Struct {
-		panic("Args must be a struct type!")
-	}
-
+func Flags(argsType reflect.Type, args ArgMap) (flags []Flag) {
 	for i := 0; i < argsType.NumField(); i++ {
 		field := argsType.Field(i)
-		flags = append(flags, makeFlag(field))
+
+		if shouldEmbed(field.Type) {
+			flags = append(flags, Flags(field.Type, args)...)
+		} else {
+			name := field.Name
+
+			var alias string
+			var usage string
+
+			arg, hasArg := args[name]
+			if hasArg {
+				alias = arg.Alias
+				usage = arg.Usage
+			} else {
+				alias = field.Tag.Get("alias")
+				usage = field.Tag.Get("usage")
+			}
+			required := true
+			fieldType := field.Type
+			if fieldType.Kind() == reflect.Pointer {
+				fieldType = fieldType.Elem()
+				required = false
+			}
+
+			flag := Flag{
+				Name:     name,
+				Alias:    alias,
+				Usage:    usage,
+				Type:     getFlagType(fieldType),
+				Required: required,
+			}
+			flags = append(flags, flag)
+		}
 	}
 	return
 }
 
-func getField(c *cli.Context, field reflect.StructField) (any, bool) {
-	name := field.Name
-	alias, hasAlias := field.Tag.Lookup("goat")
-	if hasAlias {
-		name = alias
+func Action[Args any](action func(Args) error) GoatAction {
+	return actionWithArgs(action, nil)
+}
+
+func actionWithArgs[Args any](action func(Args) error, args ArgMap) GoatAction {
+	return GoatAction{
+		ActionValue: reflect.ValueOf(action),
+		ArgsType:    reflect.TypeOf(action).In(0),
+		Flags:       Flags(reflect.TypeOf(action).In(0), args),
 	}
-	switch field.Type.Kind() {
+}
+
+func App(name string, parts ...AppPart) GoatApp {
+	app := GoatApp{
+		Name: name,
+	}
+	for _, p := range parts {
+		switch p := p.(type) {
+		case GoatCommand:
+			app.Commands = append(app.Commands, p)
+		case GoatAction:
+			app.Action = &p
+		case UsageWrapper:
+			app.Usage = string(p)
+		}
+	}
+	return app
+}
+
+type GoatApp struct {
+	Name  string
+	Usage string
+
+	Action   *GoatAction
+	Commands []GoatCommand
+}
+
+type FlagType uint
+
+const (
+	Bool FlagType = iota
+	String
+	Int
+	Int64
+	Uint
+	Uint64
+	Float64
+	StringSlice
+	IntSlice
+	Int64Slice
+)
+
+func getFlagType(p reflect.Type) FlagType {
+	switch p.Kind() {
 	case reflect.Bool:
-		return c.Bool(name), true
+		return Bool
 	case reflect.String:
-		return c.String(name), true
-	}
-
-	switch field.Type {
-	case reflect.TypeOf(Optional[bool]{}):
-		if c.IsSet(name) {
-			return Value(c.Bool(name)), true
+		return String
+	case reflect.Int:
+		return Int
+	case reflect.Int64:
+		return Int64
+	case reflect.Uint:
+		return Uint
+	case reflect.Uint64:
+		return Uint64
+	case reflect.Float64:
+		return Float64
+	case reflect.Slice:
+		switch p.Elem().Kind() {
+		case reflect.String:
+			return StringSlice
+		case reflect.Int:
+			return IntSlice
+		case reflect.Int64:
+			return Int64Slice
 		}
-		return nil, false
-	case reflect.TypeOf(Optional[string]{}):
-		if c.IsSet(name) {
-			return Value(c.String(name)), true
-		}
-		return nil, false
 	}
-	panic("Invalid field type")
+	panic("Unsupported flag type!")
 }
 
-func buildAction[Args any](action func(Args) error) func(c *cli.Context) error {
-	actionType := reflect.TypeOf(action)
-	if actionType.Kind() != reflect.Func {
-		panic("Must be a function type!")
-	}
-	if actionType.NumIn() != 1 {
-		panic("Must take an arguments struct")
-	}
-
-	argsType := actionType.In(0)
-
-	actionFunc := func(c *cli.Context) error {
-		var args Args
-
-		argsValue := reflect.ValueOf(&args)
-
-		for i := 0; i < argsType.NumField(); i++ {
-			field := argsType.Field(i)
-			value, isSet := getField(c, field)
-			if isSet {
-				fieldValue := argsValue.Elem().Field(i)
-				fieldValue.Set(reflect.ValueOf(value))
-			}
-		}
-
-		return action(args)
-	}
-
-	return actionFunc
+type Flag struct {
+	Name     string
+	Alias    string
+	Usage    string
+	Type     FlagType
+	Required bool
 }
 
-func MakeApp[Args any](app func(Args) error) *cli.App {
-	appType := reflect.TypeOf(app)
-	if appType.Kind() != reflect.Func {
-		panic("Must be a function type!")
+func (f Flag) DisplayName() string {
+	if f.Alias != "" {
+		return f.Alias
 	}
-	if appType.NumIn() != 1 {
-		panic("Must take an arguments struct")
-	}
+	return f.Name
+}
 
-	argsType := appType.In(0)
-	return &cli.App{
-		Flags:  buildFlags(argsType),
-		Action: buildAction(app),
+func (f Flag) ArgName() string {
+	return f.Name
+}
+
+type FlagGetter interface {
+	GetFlag(flag Flag) (value any, isSet bool)
+}
+
+type GoatAction struct {
+	ActionValue reflect.Value
+	ArgsType    reflect.Type
+	Flags       []Flag
+}
+
+func (action *GoatAction) Call(flagGetter FlagGetter) error {
+	argsValue := reflect.New(action.ArgsType).Elem()
+	for _, flag := range action.Flags {
+		value, isSet := flagGetter.GetFlag(flag)
+		valueValue := reflect.ValueOf(value)
+		if flag.Required {
+			argsValue.FieldByName(flag.Name).Set(valueValue)
+		} else if isSet && !valueValue.IsZero() {
+			ptr := reflect.New(valueValue.Type())
+			ptr.Elem().Set(valueValue)
+			argsValue.FieldByName(flag.Name).Set(ptr)
+		}
 	}
+	actionValue := action.ActionValue
+	ret := actionValue.Call([]reflect.Value{argsValue})[0].Interface()
+	if ret != nil {
+		return ret.(error)
+	}
+	return nil
+}
+
+type GoatCommand interface {
+	goatCommand()
+}
+
+type GoatCommandGroup struct {
+	Name        string
+	Usage       string
+	Subcommands []GoatCommand
+}
+
+type GoatCommandSingle struct {
+	Name   string
+	Usage  string
+	Action GoatAction
+}
+
+func (g GoatCommandGroup) goatCommand()  {}
+func (g GoatCommandSingle) goatCommand() {}
+
+func shouldEmbed(fieldType reflect.Type) bool {
+	return fieldType.Kind() == reflect.Struct
+}
+
+type Arg struct {
+	Name  string
+	Alias string
+	Usage string
+}
+
+type ArgMap map[string]Arg
+
+type CommandPart interface {
+	commandPart()
+}
+
+func (a ArgMap) commandPart()       {}
+func (u UsageWrapper) commandPart() {}
+
+func With(args ...Arg) ArgMap {
+	argMap := make(map[string]Arg)
+	for _, arg := range args {
+		argMap[arg.Name] = arg
+	}
+	return argMap
 }
