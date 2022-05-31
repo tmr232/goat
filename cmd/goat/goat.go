@@ -111,11 +111,11 @@ func (gh *Goatherd) findGoatApps() (apps []*types.Func) {
 		if !isIdent {
 			log.Fatalf("%s goat.Run only accepts free functions.", gh.pkg.Fset.Position(arg.Pos()))
 		}
-		defitition, exists := gh.pkg.TypesInfo.Uses[ident]
+		definition, exists := gh.pkg.TypesInfo.Uses[ident]
 		if !exists {
 			log.Fatalf("%s goat.Run expects a function.", gh.pkg.Fset.Position(arg.Pos()))
 		}
-		f, isFunction := defitition.(*types.Func)
+		f, isFunction := definition.(*types.Func)
 		if !isFunction {
 			log.Fatalf("%s goat.Run expects a function.", gh.pkg.Fset.Position(arg.Pos()))
 		}
