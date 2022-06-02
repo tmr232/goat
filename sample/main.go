@@ -8,6 +8,8 @@ import (
 //go:generate go run github.com/tmr232/goat/cmd/goat
 
 func app(name string, goodbye bool) {
+	goat.Describe(goodbye, goat.BoolFlag{Usage: "The name to greet"})
+
 	if goodbye {
 		fmt.Printf("Goodbye, %s.\n", name)
 	} else {

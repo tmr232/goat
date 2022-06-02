@@ -71,14 +71,23 @@ func (gh *Goatherd) Render(name string, data any) (string, error) {
 }
 
 func (gh *Goatherd) isGoatRun(node ast.Node) bool {
+	return gh.isCallTo(node, "github.com/tmr232/goat", "Run")
+}
+
+func (gh *Goatherd) isCallTo(node ast.Node, pkgPath, name string) bool {
+	callExpr, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return false
+	}
+
 	found := false
-	ast.Inspect(node, func(node ast.Node) bool {
+	ast.Inspect(callExpr.Fun, func(node ast.Node) bool {
 		if ident, isIdent := node.(*ast.Ident); isIdent {
 			uses, exists := gh.pkg.TypesInfo.Uses[ident]
 			if !exists {
 				return false
 			}
-			if uses.Pkg().Path() == "github.com/tmr232/goat" && uses.Name() == "Run" {
+			if uses.Pkg().Path() == pkgPath && uses.Name() == name {
 				found = true
 			}
 		}
@@ -93,7 +102,7 @@ func (gh *Goatherd) findGoatApps() (apps []*types.Func) {
 		for _, decl := range syntax.Decls {
 			ast.Inspect(decl, func(node ast.Node) bool {
 				if callExpr, isCall := node.(*ast.CallExpr); isCall {
-					if len(callExpr.Args) == 1 && gh.isGoatRun(callExpr.Fun) {
+					if len(callExpr.Args) == 1 && gh.isGoatRun(callExpr) {
 						callArgs = append(callArgs, callExpr.Args[0])
 					}
 					return false
@@ -185,6 +194,65 @@ func (gh *Goatherd) parseApp(f *types.Func) (app App) {
 	return
 }
 
+func (gh *Goatherd) parseExtra(f *types.Func) {
+	for i := 0; i < f.Scope().Len(); i++ {
+		for _, n := range f.Scope().Names() {
+			fmt.Println(n)
+		}
+	}
+
+	var fdecl *ast.FuncDecl
+	for _, syntax := range gh.pkg.Syntax {
+		astObj := syntax.Scope.Lookup(f.Name())
+		if astObj == nil {
+			continue
+		}
+		decl, isFdecl := astObj.Decl.(*ast.FuncDecl)
+		if !isFdecl {
+			continue
+		}
+		if gh.pkg.TypesInfo.Defs[decl.Name] != f {
+			continue
+		}
+		fdecl = decl
+		break
+	}
+	if fdecl == nil {
+		log.Fatal("Failed to find app")
+	}
+
+	var descriptions []*ast.CallExpr
+	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
+		if gh.isCallTo(node, "github.com/tmr232/goat", "Describe") {
+			descriptions = append(descriptions, node.(*ast.CallExpr))
+			var out bytes.Buffer
+			format.Node(&out, gh.pkg.Fset, node)
+			fmt.Println(out.String())
+			return false
+		}
+		return true
+	})
+
+	for _, desc := range descriptions {
+		name := desc.Args[0].(*ast.Ident).Name
+		fmt.Println("Name: ", name)
+		info := desc.Args[1].(*ast.CompositeLit)
+		for _, elt := range info.Elts {
+			kv := elt.(*ast.KeyValueExpr)
+			key := kv.Key.(*ast.Ident).Name
+			var out bytes.Buffer
+			format.Node(&out, gh.pkg.Fset, kv.Value)
+			value := out.String()
+			fmt.Println("Key: ", key, "Value: ", value)
+		}
+	}
+
+	//var out bytes.Buffer
+	//format.Node(&out, gh.pkg.Fset, fdecl)
+	//fmt.Println(out.String())
+	//ast.Print(gh.pkg.Fset, fdecl)
+}
+
 func formatSource(src string) string {
 	formattedSrc, err := format.Source([]byte(src))
 	if err != nil {
@@ -204,13 +272,12 @@ func main() {
 	}
 	for _, f := range gh.findGoatApps() {
 		data.Apps = append(data.Apps, gh.parseApp(f))
+		gh.parseExtra(f)
 	}
 	file, err := gh.Render("goat-file", data)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Println(formatSource(file))
 
 	err = ioutil.WriteFile(data.Package+"_goat.go", []byte(formatSource(file)), 0644)
 	if err != nil {
