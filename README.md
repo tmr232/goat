@@ -39,3 +39,6 @@ func main() {
 Note that currently, only `string` and `bool` arguments are supported.
 
 Additionally, you'll need the [urfave/cli](https://github.com/urfave/cli) package to run the resulting app. 
+
+
+See [this blog post](https://blog.tamir.dev/posts/goat-codegen-initial/) for more implementation details.
