@@ -32,9 +32,9 @@ func init() {
 
     __goatApp := &cli.App{
     Flags: []cli.Flag{
-        {{range .Args}}
+        {{- range .Args}}
             {{.AsFlag}},
-        {{end}}
+        {{- end}}
     },
     Action: func(c *cli.Context) {
     {{.Func}}({{join .Args.Names ", "}})
