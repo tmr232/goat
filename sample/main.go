@@ -8,9 +8,9 @@ import (
 //go:generate go run github.com/tmr232/goat/cmd/goat
 
 func app(name string, goodbye bool, question *string) {
-	goat.Describe(name).As(goat.StringFlag{Usage: "The name to greet"})
+	goat.Describe(name).As(goat.DefaultStringFlag{Usage: "The name to greet", Default: "World"})
 	goat.Describe(goodbye).As(goat.BoolFlag{Usage: "Enable to say Goodbye", Name: "bye"})
-	goat.Describe(question).As(goat.OptStringFlag{Usage: "Instead of a greeting, ask a question."})
+	goat.Describe(question).As(goat.OptionalStringFlag{Usage: "Instead of a greeting, ask a question."})
 
 	if question != nil {
 		fmt.Printf("%s, %s?", *question, name)

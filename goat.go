@@ -54,44 +54,68 @@ func (flag BoolFlag) AsCliFlag(defaultName string, dest *bool) cli.Flag {
 	}
 }
 
-type StringFlag struct {
-	Name    string
-	Usage   string
-	Default string
+type RequiredStringFlag struct {
+	Name  string
+	Usage string
 }
 
-func (flag StringFlag) flag(string) {}
-func (flag StringFlag) CliName(defaultName string) string {
+type StringFlag = RequiredStringFlag
+
+func (flag RequiredStringFlag) flag(string) {}
+func (flag RequiredStringFlag) CliName(defaultName string) string {
 	if flag.Name == "" {
 		return defaultName
 	}
 	return flag.Name
 }
 
-func (flag StringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
+func (flag RequiredStringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
 	return &cli.StringFlag{
 		Name:        flag.CliName(defaultName),
 		Usage:       flag.Usage,
-		Value:       flag.Default,
 		Required:    true,
 		Destination: dest,
 	}
 }
 
-type OptStringFlag struct {
-	Name  string
-	Usage string
+type DefaultStringFlag struct {
+	Name    string
+	Usage   string
+	Default string
 }
 
-func (flag OptStringFlag) flag(*string) {}
-func (flag OptStringFlag) CliName(defaultName string) string {
+func (flag DefaultStringFlag) flag(string) {}
+func (flag DefaultStringFlag) CliName(defaultName string) string {
 	if flag.Name == "" {
 		return defaultName
 	}
 	return flag.Name
 }
 
-func (flag OptStringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
+func (flag DefaultStringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
+	return &cli.StringFlag{
+		Name:        flag.CliName(defaultName),
+		Usage:       flag.Usage,
+		Required:    false,
+		Value:       flag.Default,
+		Destination: dest,
+	}
+}
+
+type OptionalStringFlag struct {
+	Name  string
+	Usage string
+}
+
+func (flag OptionalStringFlag) flag(*string) {}
+func (flag OptionalStringFlag) CliName(defaultName string) string {
+	if flag.Name == "" {
+		return defaultName
+	}
+	return flag.Name
+}
+
+func (flag OptionalStringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
 	return &cli.StringFlag{
 		Name:        flag.CliName(defaultName),
 		Usage:       flag.Usage,
