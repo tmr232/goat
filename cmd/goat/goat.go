@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/urfave/cli"
 	"go/ast"
 	"go/format"
 	"go/types"
@@ -136,6 +137,7 @@ func (gh *Goatherd) findGoatApps() (apps []*types.Func) {
 type Arg struct {
 	Name string
 	Type string
+	Flag CliFlagMaker
 	gh   *Goatherd
 }
 
@@ -181,6 +183,115 @@ type GoatData struct {
 	Apps    []App
 }
 
+type CliFlagMaker interface {
+	MakeFlag(defaultName string, destination any) *cli.Flag
+}
+
+type Flag struct {
+	Name  string
+	Usage string
+}
+
+func (f Flag) RealName(defaultName string) string {
+	if f.Name == "" {
+		return defaultName
+	}
+	return f.Name
+}
+
+type BoolFlag struct {
+	Flag
+	Default bool
+}
+
+func (flag BoolFlag) MakeFlag(defaultName string, destination any) cli.Flag {
+	if flag.Default {
+		return &cli.BoolTFlag{
+			Name:        flag.RealName(defaultName),
+			Usage:       flag.Usage,
+			Destination: destination.(*bool),
+		}
+	} else {
+		return &cli.BoolFlag{
+			Name:        flag.RealName(defaultName),
+			Usage:       flag.Usage,
+			Destination: destination.(*bool),
+		}
+	}
+}
+
+type StringFlag struct {
+	Flag
+}
+
+func (flag StringFlag) MakeFlag(defaultName string, destination any) cli.Flag {
+	return &cli.StringFlag{
+		Name:        flag.RealName(defaultName),
+		Usage:       flag.Usage,
+		Required:    true,
+		Destination: destination.(*string),
+	}
+}
+
+type GoatArg struct {
+	Name string
+	Type string
+}
+type GoatSignature struct {
+	Name string
+	Args []GoatArg
+}
+
+func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature) {
+	signature.Name = f.Name()
+
+	funcSignature := f.Type().(*types.Signature)
+	for i := 0; i < funcSignature.Params().Len(); i++ {
+		param := funcSignature.Params().At(i)
+		paramName := param.Name()
+		paramType := param.Type().String()
+		signature.Args = append(signature.Args, GoatArg{Name: paramName, Type: paramType})
+	}
+	return
+}
+
+type GoatDescription string
+type GoatApp struct {
+	Func  string                     // Func is app function
+	Flags map[string]GoatDescription // The flags for the app. Should later be a type that isn't CLI bound...
+}
+
+func makeDefaultDescription(name, typ string) GoatDescription {
+	switch typ {
+	case "string":
+		return GoatDescription(fmt.Sprintf("%#v", StringFlag{
+			Flag: Flag{
+				Name: name,
+			},
+		}))
+	case "bool":
+		return GoatDescription(fmt.Sprintf("%#v", BoolFlag{
+			Flag: Flag{Name: name},
+		}))
+	}
+	log.Fatalf("Cannot describe type %s", typ)
+	return ""
+}
+
+func MakeApp(signature GoatSignature, descriptions map[string]GoatDescription) (app GoatApp) {
+	app.Func = signature.Name
+	app.Flags = make(map[string]GoatDescription)
+	for _, arg := range signature.Args {
+		description, exists := descriptions[arg.Name]
+		if exists {
+			app.Flags[arg.Name] = description
+		} else {
+			app.Flags[arg.Name] = makeDefaultDescription(arg.Name, arg.Type)
+		}
+	}
+	return
+}
+
 func (gh *Goatherd) parseApp(f *types.Func) (app App) {
 	app.Func = f.Name()
 
@@ -194,7 +305,7 @@ func (gh *Goatherd) parseApp(f *types.Func) (app App) {
 	return
 }
 
-func (gh *Goatherd) parseExtra(f *types.Func) {
+func (gh *Goatherd) parseDescriptions(f *types.Func) map[string]GoatDescription {
 	for i := 0; i < f.Scope().Len(); i++ {
 		for _, n := range f.Scope().Names() {
 			fmt.Println(n)
@@ -233,6 +344,8 @@ func (gh *Goatherd) parseExtra(f *types.Func) {
 		return true
 	})
 
+	result := make(map[string]GoatDescription)
+
 	for _, desc := range descriptions {
 		name := desc.Args[0].(*ast.Ident).Name
 		fmt.Println("Name: ", name)
@@ -245,7 +358,13 @@ func (gh *Goatherd) parseExtra(f *types.Func) {
 			value := out.String()
 			fmt.Println("Key: ", key, "Value: ", value)
 		}
+		// Actually create the description!
+		var out bytes.Buffer
+		format.Node(&out, gh.pkg.Fset, info)
+		result[name] = GoatDescription(out.String())
 	}
+
+	return result
 
 	//var out bytes.Buffer
 	//format.Node(&out, gh.pkg.Fset, fdecl)
@@ -272,7 +391,10 @@ func main() {
 	}
 	for _, f := range gh.findGoatApps() {
 		data.Apps = append(data.Apps, gh.parseApp(f))
-		gh.parseExtra(f)
+		signature := gh.parseSignature(f)
+		descriptions := gh.parseDescriptions(f)
+		app := MakeApp(signature, descriptions)
+		fmt.Printf("%#v\n", app)
 	}
 	file, err := gh.Render("goat-file", data)
 	if err != nil {
