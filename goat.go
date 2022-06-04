@@ -24,49 +24,56 @@ type Flag[T any] interface {
 }
 
 type BoolFlag struct {
-	Name     string
-	Usage    string
-	Required bool
-	Value    bool
+	Name    string
+	Usage   string
+	Default bool
 }
 
 func (flag BoolFlag) flag(bool) {}
 
-func (flag BoolFlag) AsCliFlag(dest *bool) cli.Flag {
-	if flag.Value {
+func (flag BoolFlag) AsCliFlag(defaultName string, dest *bool) cli.Flag {
+	name := flag.Name
+	if name == "" {
+		name = defaultName
+	}
+	if flag.Default {
 		return &cli.BoolTFlag{
-			Name:        flag.Name,
-			Usage:       flag.Name,
-			Required:    flag.Required,
+			Name:        name,
+			Usage:       flag.Usage,
 			Destination: dest,
 		}
 	} else {
 		return &cli.BoolFlag{
-			Name:        flag.Name,
-			Usage:       flag.Name,
-			Required:    flag.Required,
+			Name:        name,
+			Usage:       flag.Usage,
 			Destination: dest,
 		}
 	}
 }
 
 type StringFlag struct {
-	Name     string
-	Usage    string
-	Required bool
-	Value    string
+	Name    string
+	Usage   string
+	Default string
 }
 
 func (flag StringFlag) flag(string) {}
 
-func (flag StringFlag) AsCliFlag(dest *string) cli.Flag {
+func (flag StringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
+	name := flag.Name
+	if name == "" {
+		name = defaultName
+	}
 	return &cli.StringFlag{
-		Name:        flag.Name,
+		Name:        name,
 		Usage:       flag.Usage,
-		Required:    flag.Required,
-		Value:       flag.Value,
+		Value:       flag.Default,
 		Destination: dest,
 	}
 }
 
-func Describe[T any](arg T, flagDef Flag[T]) {}
+type Descriptor[T any] struct{}
+
+func (d Descriptor[T]) As(Flag[T]) {}
+
+func Describe[T any](arg T) Descriptor[T] { return Descriptor[T]{} }

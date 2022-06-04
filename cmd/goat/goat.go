@@ -4,13 +4,14 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/tmr232/goat"
 	"go/ast"
 	"go/format"
 	"go/types"
 	"golang.org/x/tools/go/packages"
 	"io/ioutil"
 	"log"
+	"reflect"
 	"strings"
 	"text/template"
 )
@@ -134,103 +135,9 @@ func (gh *Goatherd) findGoatApps() (apps []*types.Func) {
 	return
 }
 
-type Arg struct {
-	Name string
-	Type string
-	Flag CliFlagMaker
-	gh   *Goatherd
-}
-
-func (a Arg) AsArg() string {
-	return fmt.Sprintf("%s %s", a.Name, a.Type)
-}
-
-func (a Arg) AsFlag() string {
-	switch a.Type {
-	case "string":
-		flag, err := a.gh.Render("string-flag", a)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return flag
-	case "bool":
-		flag, err := a.gh.Render("bool-flag", a)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return flag
-	}
-	log.Fatalf("Unsupported type %s", a.Type)
-	return ""
-}
-
-type Args []Arg
-
-func (args Args) Names() (names []string) {
-	for _, arg := range args {
-		names = append(names, arg.Name)
-	}
-	return
-}
-
-type App struct {
-	Func string
-	Args Args
-}
-
 type GoatData struct {
 	Package string
-	Apps    []App
-}
-
-type CliFlagMaker interface {
-	MakeFlag(defaultName string, destination any) *cli.Flag
-}
-
-type Flag struct {
-	Name  string
-	Usage string
-}
-
-func (f Flag) RealName(defaultName string) string {
-	if f.Name == "" {
-		return defaultName
-	}
-	return f.Name
-}
-
-type BoolFlag struct {
-	Flag
-	Default bool
-}
-
-func (flag BoolFlag) MakeFlag(defaultName string, destination any) cli.Flag {
-	if flag.Default {
-		return &cli.BoolTFlag{
-			Name:        flag.RealName(defaultName),
-			Usage:       flag.Usage,
-			Destination: destination.(*bool),
-		}
-	} else {
-		return &cli.BoolFlag{
-			Name:        flag.RealName(defaultName),
-			Usage:       flag.Usage,
-			Destination: destination.(*bool),
-		}
-	}
-}
-
-type StringFlag struct {
-	Flag
-}
-
-func (flag StringFlag) MakeFlag(defaultName string, destination any) cli.Flag {
-	return &cli.StringFlag{
-		Name:        flag.RealName(defaultName),
-		Usage:       flag.Usage,
-		Required:    true,
-		Destination: destination.(*string),
-	}
+	Apps    []GoatApp
 }
 
 type GoatArg struct {
@@ -255,27 +162,31 @@ func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature) {
 	return
 }
 
-type GoatDescription string
+type GoatDescription struct {
+	Type string
+	Flag string
+}
 type GoatApp struct {
 	Func  string                     // Func is app function
 	Flags map[string]GoatDescription // The flags for the app. Should later be a type that isn't CLI bound...
 }
 
+func (app GoatApp) ArgNames() (names []string) {
+	for name, _ := range app.Flags {
+		names = append(names, name)
+	}
+	return
+}
+
 func makeDefaultDescription(name, typ string) GoatDescription {
 	switch typ {
 	case "string":
-		return GoatDescription(fmt.Sprintf("%#v", StringFlag{
-			Flag: Flag{
-				Name: name,
-			},
-		}))
+		return GoatDescription{typ, fmt.Sprintf("%#v", goat.StringFlag{})}
 	case "bool":
-		return GoatDescription(fmt.Sprintf("%#v", BoolFlag{
-			Flag: Flag{Name: name},
-		}))
+		return GoatDescription{typ, fmt.Sprintf("%#v", goat.BoolFlag{})}
 	}
 	log.Fatalf("Cannot describe type %s", typ)
-	return ""
+	return GoatDescription{}
 }
 
 func MakeApp(signature GoatSignature, descriptions map[string]GoatDescription) (app GoatApp) {
@@ -292,17 +203,75 @@ func MakeApp(signature GoatSignature, descriptions map[string]GoatDescription) (
 	return
 }
 
-func (gh *Goatherd) parseApp(f *types.Func) (app App) {
-	app.Func = f.Name()
-
-	signature := f.Type().(*types.Signature)
-	for i := 0; i < signature.Params().Len(); i++ {
-		param := signature.Params().At(i)
-		paramName := param.Name()
-		paramType := param.Type().String()
-		app.Args = append(app.Args, Arg{Name: paramName, Type: paramType, gh: gh})
+func DigFor[T any](base any, path ...string) (val T, found bool) {
+	if base == nil {
+		return *new(T), false
 	}
-	return
+
+	value := reflect.ValueOf(base)
+
+	for _, pathPart := range path {
+		for value.Kind() == reflect.Pointer || value.Kind() == reflect.Interface {
+			if value.IsNil() {
+				return *new(T), false
+			}
+			value = value.Elem()
+		}
+		field := value.FieldByName(pathPart)
+		if field == *new(reflect.Value) {
+			return *new(T), false
+		}
+		value = field
+	}
+
+	result, isValid := value.Interface().(T)
+	return result, isValid
+}
+
+func (gh *Goatherd) matchDescription(node ast.Node) bool {
+	callExpr, isCallExpr := node.(*ast.CallExpr)
+	if !isCallExpr {
+		return false
+	}
+
+	pathToDescribeSelector := []string{"Fun", "X", "Fun"}
+	pathToGoat := append(pathToDescribeSelector, "X")
+	pathToDescribe := append(pathToDescribeSelector, "Sel")
+	pathToAs := []string{"Fun", "Sel"}
+
+	goatIdent, found := DigFor[*ast.Ident](callExpr, pathToGoat...)
+	if !found {
+		return false
+	}
+	describeIdent, found := DigFor[*ast.Ident](callExpr, pathToDescribe...)
+	if !found {
+		return false
+	}
+	asIdent, found := DigFor[*ast.Ident](callExpr, pathToAs...)
+	if !found {
+		return false
+	}
+
+	if goatIdent.Name != "goat" || describeIdent.Name != "Describe" || asIdent.Name != "As" {
+		return false
+	}
+
+	return true
+}
+
+func (gh *Goatherd) parseDescription(node ast.Node) (string, GoatDescription) {
+	asCall := node.(*ast.CallExpr)
+
+	describeArgs, _ := DigFor[[]ast.Expr](asCall, "Fun", "X", "Args")
+	ident := describeArgs[0].(*ast.Ident)
+	name := ident.Name
+	typ := gh.pkg.TypesInfo.TypeOf(ident).String()
+
+	var out bytes.Buffer
+	format.Node(&out, gh.pkg.Fset, asCall.Args[0])
+	flag := out.String()
+
+	return name, GoatDescription{Type: typ, Flag: flag}
 }
 
 func (gh *Goatherd) parseDescriptions(f *types.Func) map[string]GoatDescription {
@@ -332,44 +301,29 @@ func (gh *Goatherd) parseDescriptions(f *types.Func) map[string]GoatDescription 
 		log.Fatal("Failed to find app")
 	}
 
-	var descriptions []*ast.CallExpr
-	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
-		if gh.isCallTo(node, "github.com/tmr232/goat", "Describe") {
-			descriptions = append(descriptions, node.(*ast.CallExpr))
-			var out bytes.Buffer
-			format.Node(&out, gh.pkg.Fset, node)
-			fmt.Println(out.String())
-			return false
-		}
-		return true
-	})
-
+	//var descriptions []*ast.CallExpr
+	//ast.Inspect(fdecl.Body, func(node ast.Node) bool {
+	//	if gh.isCallTo(node, "github.com/tmr232/goat", "Describe") {
+	//		descriptions = append(descriptions, node.(*ast.CallExpr))
+	//		var out bytes.Buffer
+	//		format.Node(&out, gh.pkg.Fset, node)
+	//		fmt.Println(out.String())
+	//		return false
+	//	}
+	//	return true
+	//})
 	result := make(map[string]GoatDescription)
-
-	for _, desc := range descriptions {
-		name := desc.Args[0].(*ast.Ident).Name
-		fmt.Println("Name: ", name)
-		info := desc.Args[1].(*ast.CompositeLit)
-		for _, elt := range info.Elts {
-			kv := elt.(*ast.KeyValueExpr)
-			key := kv.Key.(*ast.Ident).Name
-			var out bytes.Buffer
-			format.Node(&out, gh.pkg.Fset, kv.Value)
-			value := out.String()
-			fmt.Println("Key: ", key, "Value: ", value)
+	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
+		if !gh.matchDescription(node) {
+			return true
 		}
-		// Actually create the description!
-		var out bytes.Buffer
-		format.Node(&out, gh.pkg.Fset, info)
-		result[name] = GoatDescription(out.String())
-	}
+		name, description := gh.parseDescription(node)
+		result[name] = description
+		return false
+	})
 
 	return result
 
-	//var out bytes.Buffer
-	//format.Node(&out, gh.pkg.Fset, fdecl)
-	//fmt.Println(out.String())
-	//ast.Print(gh.pkg.Fset, fdecl)
 }
 
 func formatSource(src string) string {
@@ -390,10 +344,10 @@ func main() {
 		Package: gh.pkg.Name,
 	}
 	for _, f := range gh.findGoatApps() {
-		data.Apps = append(data.Apps, gh.parseApp(f))
 		signature := gh.parseSignature(f)
 		descriptions := gh.parseDescriptions(f)
 		app := MakeApp(signature, descriptions)
+		data.Apps = append(data.Apps, app)
 		fmt.Printf("%#v\n", app)
 	}
 	file, err := gh.Render("goat-file", data)

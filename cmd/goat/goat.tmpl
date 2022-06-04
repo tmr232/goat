@@ -26,18 +26,18 @@ func init() {
 {{- end}}
 
 {{define "cli-app"}}
-    {{range .Args}}
-        var {{template "var-name" .Name}} {{.Type}}
+    {{range $name, $flag := .Flags}}
+        var {{template "var-name" $name}} {{$flag.Type}}
     {{end}}
 
     __goatApp := &cli.App{
     Flags: []cli.Flag{
-        {{range .Args}}
-            {{.AsFlag}},
+        {{range $name, $flag := .Flags}}
+            {{$flag.Flag}}.AsCliFlag("{{$name}}", &{{$name}}),
         {{end}}
     },
     Action: func(c *cli.Context) {
-    {{.Func}}({{join .Args.Names ", "}})
+    {{.Func}}({{join .ArgNames ", "}})
     },
     }
 
