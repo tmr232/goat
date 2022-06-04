@@ -167,13 +167,14 @@ type GoatDescription struct {
 	Flag string
 }
 type GoatApp struct {
-	Func  string                     // Func is app function
-	Flags map[string]GoatDescription // The flags for the app. Should later be a type that isn't CLI bound...
+	Name      string // Name is app function
+	Signature GoatSignature
+	Flags     map[string]GoatDescription // The flags for the app. Should later be a type that isn't CLI bound...
 }
 
 func (app GoatApp) ArgNames() (names []string) {
-	for name, _ := range app.Flags {
-		names = append(names, name)
+	for _, arg := range app.Signature.Args {
+		names = append(names, arg.Name)
 	}
 	return
 }
@@ -190,7 +191,8 @@ func makeDefaultDescription(name, typ string) GoatDescription {
 }
 
 func MakeApp(signature GoatSignature, descriptions map[string]GoatDescription) (app GoatApp) {
-	app.Func = signature.Name
+	app.Signature = signature
+	app.Name = signature.Name
 	app.Flags = make(map[string]GoatDescription)
 	for _, arg := range signature.Args {
 		description, exists := descriptions[arg.Name]

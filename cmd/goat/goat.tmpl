@@ -14,7 +14,7 @@ import (
 {{define "register-apps"}}
 func init() {
     {{range .Apps}}
-        goat.Register({{.Func}}, {{template "app-wrapper" .}})
+        goat.Register({{.Signature.Name}}, {{template "app-wrapper" .}})
     {{end}}
 }
 {{end}}
@@ -27,8 +27,8 @@ func init() {
 
 {{define "cli-app"}}
     {{range $name, $flag := .Flags}}
-        var {{template "var-name" $name}} {{$flag.Type}}
-    {{end}}
+        var {{$name}} {{$flag.Type}}
+    {{- end}}
 
     __goatApp := &cli.App{
     Flags: []cli.Flag{
@@ -37,7 +37,7 @@ func init() {
         {{- end}}
     },
     Action: func(c *cli.Context) {
-    {{.Func}}({{join .ArgNames ", "}})
+    {{.Signature.Name}}({{join .ArgNames ", "}})
     },
     }
 
@@ -47,17 +47,3 @@ func init() {
     }
 {{end}}
 
-{{define "var-name"}}{{.}}{{end}}
-{{define "string-flag" -}}
-    &cli.StringFlag{
-    Name:        "{{.Name}}",
-    Destination: &{{template "var-name" .Name}},
-    Required:    true,
-    }
-{{- end}}
-{{define "bool-flag" -}}
-    &cli.BoolFlag{
-    Name:        "{{.Name}}",
-    Destination: &{{template "var-name" .Name}},
-    }
-{{- end}}
