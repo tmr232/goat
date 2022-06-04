@@ -163,13 +163,22 @@ func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature) {
 }
 
 type GoatDescription struct {
-	Type string
-	Flag string
+	Type  string
+	Flag  string
+	IsPtr bool
 }
 type GoatApp struct {
 	Name      string // Name is app function
 	Signature GoatSignature
 	Flags     map[string]GoatDescription // The flags for the app. Should later be a type that isn't CLI bound...
+}
+
+func (app GoatApp) GetFlag(name string) string {
+	return app.Flags[name].Flag
+}
+
+func (app GoatApp) IsFlagPtr(name string) bool {
+	return app.Flags[name].IsPtr
 }
 
 func (app GoatApp) ArgNames() (names []string) {
@@ -182,11 +191,11 @@ func (app GoatApp) ArgNames() (names []string) {
 func makeDefaultDescription(name, typ string) GoatDescription {
 	switch typ {
 	case "*string":
-		return GoatDescription{typ, fmt.Sprintf("%#v", goat.OptStringFlag{})}
+		return GoatDescription{Type: typ, Flag: fmt.Sprintf("%#v", goat.OptStringFlag{})}
 	case "string":
-		return GoatDescription{typ, fmt.Sprintf("%#v", goat.StringFlag{})}
+		return GoatDescription{Type: typ, Flag: fmt.Sprintf("%#v", goat.StringFlag{})}
 	case "bool":
-		return GoatDescription{typ, fmt.Sprintf("%#v", goat.BoolFlag{})}
+		return GoatDescription{Type: typ, Flag: fmt.Sprintf("%#v", goat.BoolFlag{})}
 	}
 	log.Fatalf("Cannot describe type %s", typ)
 	return GoatDescription{}
@@ -267,13 +276,20 @@ func (gh *Goatherd) parseDescription(node ast.Node) (string, GoatDescription) {
 	describeArgs, _ := DigFor[[]ast.Expr](asCall, "Fun", "X", "Args")
 	ident := describeArgs[0].(*ast.Ident)
 	name := ident.Name
-	typ := gh.pkg.TypesInfo.TypeOf(ident).String()
+	argType := gh.pkg.TypesInfo.TypeOf(ident)
+	ptrType, isPtr := argType.(*types.Pointer)
+	var typ string
+	if isPtr {
+		typ = ptrType.Elem().String()
+	} else {
+		typ = argType.String()
+	}
 
 	var out bytes.Buffer
 	format.Node(&out, gh.pkg.Fset, asCall.Args[0])
 	flag := out.String()
 
-	return name, GoatDescription{Type: typ, Flag: flag}
+	return name, GoatDescription{Type: typ, Flag: flag, IsPtr: isPtr}
 }
 
 func (gh *Goatherd) parseDescriptions(f *types.Func) map[string]GoatDescription {

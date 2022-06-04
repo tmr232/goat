@@ -9,7 +9,7 @@ import (
 
 func app(name string, goodbye bool, question *string) {
 	goat.Describe(name).As(goat.StringFlag{Usage: "The name to greet"})
-	goat.Describe(goodbye).As(goat.BoolFlag{Usage: "Enable to say Goodbye"})
+	goat.Describe(goodbye).As(goat.BoolFlag{Usage: "Enable to say Goodbye", Name: "bye"})
 	goat.Describe(question).As(goat.OptStringFlag{Usage: "Instead of a greeting, ask a question."})
 
 	if question != nil {

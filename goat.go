@@ -21,6 +21,7 @@ func Run(f any) {
 
 type Flag[T any] interface {
 	flag(T)
+	CliName(defaultName string) string
 }
 
 type BoolFlag struct {
@@ -30,21 +31,23 @@ type BoolFlag struct {
 }
 
 func (flag BoolFlag) flag(bool) {}
+func (flag BoolFlag) CliName(defaultName string) string {
+	if flag.Name == "" {
+		return defaultName
+	}
+	return flag.Name
+}
 
 func (flag BoolFlag) AsCliFlag(defaultName string, dest *bool) cli.Flag {
-	name := flag.Name
-	if name == "" {
-		name = defaultName
-	}
 	if flag.Default {
 		return &cli.BoolTFlag{
-			Name:        name,
+			Name:        flag.CliName(defaultName),
 			Usage:       flag.Usage,
 			Destination: dest,
 		}
 	} else {
 		return &cli.BoolFlag{
-			Name:        name,
+			Name:        flag.CliName(defaultName),
 			Usage:       flag.Usage,
 			Destination: dest,
 		}
@@ -58,14 +61,16 @@ type StringFlag struct {
 }
 
 func (flag StringFlag) flag(string) {}
+func (flag StringFlag) CliName(defaultName string) string {
+	if flag.Name == "" {
+		return defaultName
+	}
+	return flag.Name
+}
 
 func (flag StringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
-	name := flag.Name
-	if name == "" {
-		name = defaultName
-	}
 	return &cli.StringFlag{
-		Name:        name,
+		Name:        flag.CliName(defaultName),
 		Usage:       flag.Usage,
 		Value:       flag.Default,
 		Required:    true,
@@ -79,14 +84,16 @@ type OptStringFlag struct {
 }
 
 func (flag OptStringFlag) flag(*string) {}
+func (flag OptStringFlag) CliName(defaultName string) string {
+	if flag.Name == "" {
+		return defaultName
+	}
+	return flag.Name
+}
 
 func (flag OptStringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
-	name := flag.Name
-	if name == "" {
-		name = defaultName
-	}
 	return &cli.StringFlag{
-		Name:        name,
+		Name:        flag.CliName(defaultName),
 		Usage:       flag.Usage,
 		Required:    false,
 		Destination: dest,
@@ -98,3 +105,10 @@ type Descriptor[T any] struct{}
 func (d Descriptor[T]) As(Flag[T]) {}
 
 func Describe[T any](arg T) Descriptor[T] { return Descriptor[T]{} }
+
+func GetOptional[T any](c *cli.Context, name string, dest *T) *T {
+	if c.IsSet(name) {
+		return dest
+	}
+	return nil
+}

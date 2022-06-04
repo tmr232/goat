@@ -31,13 +31,22 @@ func init() {
     {{- end}}
 
     __goatApp := &cli.App{
-    Flags: []cli.Flag{
-        {{range $name, $flag := .Flags}}
-            {{$flag.Flag}}.AsCliFlag("{{$name}}", &{{$name}}),
-        {{- end}}
-    },
-    Action: func(c *cli.Context) {
-    {{.Signature.Name}}({{join .ArgNames ", "}})
+        Flags: []cli.Flag{
+            {{range $name, $flag := .Flags}}
+                {{$flag.Flag}}.AsCliFlag("{{$name}}", &{{$name}}),
+            {{- end}}
+        },
+        Action: func(c *cli.Context) {
+        {{.Signature.Name}}(
+            {{ $base := . }}
+            {{- range $index, $arg := .Signature.Args -}}
+                {{- if $base.IsFlagPtr $arg.Name -}}
+                    goat.GetOptional(c, {{$base.GetFlag $arg.Name }}.CliName({{$arg.Name}}), &question),
+                {{- else -}}
+                    {{$arg.Name}},
+                {{- end -}}
+            {{- end}}
+        )
     },
     }
 
