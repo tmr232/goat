@@ -41,10 +41,14 @@ func init() {
             {{ $base := . }}
             {{- range $index, $arg := .Signature.Args -}}
                 {{- if $base.IsFlagPtr $arg.Name -}}
-                    goat.GetOptional(c, {{$base.GetFlag $arg.Name }}.CliName({{$arg.Name}}), &question),
-                {{- else -}}
+                    goat.GetOptional(
+                        c,
+                        {{$base.GetFlag $arg.Name }}.CliName({{$arg.Name}}),
+                         &question,
+                         ),
+                {{else -}}
                     {{$arg.Name}},
-                {{- end -}}
+                {{end -}}
             {{- end}}
         )
     },
