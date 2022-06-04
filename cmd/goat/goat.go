@@ -234,25 +234,23 @@ func (gh *Goatherd) matchDescription(node ast.Node) bool {
 		return false
 	}
 
-	pathToDescribeSelector := []string{"Fun", "X", "Fun"}
-	pathToGoat := append(pathToDescribeSelector, "X")
-	pathToDescribe := append(pathToDescribeSelector, "Sel")
 	pathToAs := []string{"Fun", "Sel"}
 
-	goatIdent, found := DigFor[*ast.Ident](callExpr, pathToGoat...)
+	maybeGoatCall, found := DigFor[*ast.CallExpr](callExpr, "Fun", "X")
 	if !found {
 		return false
 	}
-	describeIdent, found := DigFor[*ast.Ident](callExpr, pathToDescribe...)
-	if !found {
+
+	if !gh.isCallTo(maybeGoatCall, "github.com/tmr232/goat", "Describe") {
 		return false
 	}
+
 	asIdent, found := DigFor[*ast.Ident](callExpr, pathToAs...)
 	if !found {
 		return false
 	}
 
-	if goatIdent.Name != "goat" || describeIdent.Name != "Describe" || asIdent.Name != "As" {
+	if asIdent.Name != "As" {
 		return false
 	}
 
@@ -301,17 +299,6 @@ func (gh *Goatherd) parseDescriptions(f *types.Func) map[string]GoatDescription 
 		log.Fatal("Failed to find app")
 	}
 
-	//var descriptions []*ast.CallExpr
-	//ast.Inspect(fdecl.Body, func(node ast.Node) bool {
-	//	if gh.isCallTo(node, "github.com/tmr232/goat", "Describe") {
-	//		descriptions = append(descriptions, node.(*ast.CallExpr))
-	//		var out bytes.Buffer
-	//		format.Node(&out, gh.pkg.Fset, node)
-	//		fmt.Println(out.String())
-	//		return false
-	//	}
-	//	return true
-	//})
 	result := make(map[string]GoatDescription)
 	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
 		if !gh.matchDescription(node) {
