@@ -68,6 +68,27 @@ func (flag StringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
 		Name:        name,
 		Usage:       flag.Usage,
 		Value:       flag.Default,
+		Required:    true,
+		Destination: dest,
+	}
+}
+
+type OptStringFlag struct {
+	Name  string
+	Usage string
+}
+
+func (flag OptStringFlag) flag(*string) {}
+
+func (flag OptStringFlag) AsCliFlag(defaultName string, dest *string) cli.Flag {
+	name := flag.Name
+	if name == "" {
+		name = defaultName
+	}
+	return &cli.StringFlag{
+		Name:        name,
+		Usage:       flag.Usage,
+		Required:    false,
 		Destination: dest,
 	}
 }

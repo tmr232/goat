@@ -181,6 +181,8 @@ func (app GoatApp) ArgNames() (names []string) {
 
 func makeDefaultDescription(name, typ string) GoatDescription {
 	switch typ {
+	case "*string":
+		return GoatDescription{typ, fmt.Sprintf("%#v", goat.OptStringFlag{})}
 	case "string":
 		return GoatDescription{typ, fmt.Sprintf("%#v", goat.StringFlag{})}
 	case "bool":
