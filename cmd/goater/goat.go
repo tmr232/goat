@@ -5,13 +5,13 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/tmr232/goat"
+	"github.com/tmr232/goat/python"
 	"go/ast"
 	"go/format"
 	"go/types"
 	"golang.org/x/tools/go/packages"
 	"io/ioutil"
 	"log"
-	"reflect"
 	"strings"
 	"text/template"
 )
@@ -220,64 +220,26 @@ func MakeApp(signature GoatSignature, descriptions map[string]GoatDescription) (
 	return
 }
 
-func DigFor[T any](base any, path ...string) (val T, found bool) {
-	if base == nil {
-		return *new(T), false
-	}
-
-	value := reflect.ValueOf(base)
-
-	for _, pathPart := range path {
-		for value.Kind() == reflect.Pointer || value.Kind() == reflect.Interface {
-			if value.IsNil() {
-				return *new(T), false
-			}
-			value = value.Elem()
-		}
-		field := value.FieldByName(pathPart)
-		if field == *new(reflect.Value) {
-			return *new(T), false
-		}
-		value = field
-	}
-
-	result, isValid := value.Interface().(T)
-	return result, isValid
-}
-
 func (gh *Goatherd) matchDescription(node ast.Node) bool {
-	callExpr, isCallExpr := node.(*ast.CallExpr)
-	if !isCallExpr {
-		return false
-	}
+	query := python.StructQuery[struct {
+		_   *ast.CallExpr
+		Fun struct {
+			_ *ast.SelectorExpr
+			X struct {
+				*ast.CallExpr
+			}
+			Sel struct {
+				_    *ast.Ident
+				Name string
+			}
+		}
+	}](node)
 
-	pathToAs := []string{"Fun", "Sel"}
-
-	maybeGoatCall, found := DigFor[*ast.CallExpr](callExpr, "Fun", "X")
-	if !found {
-		return false
-	}
-
-	if !gh.isCallTo(maybeGoatCall, "github.com/tmr232/goat", "Describe") {
-		return false
-	}
-
-	asIdent, found := DigFor[*ast.Ident](callExpr, pathToAs...)
-	if !found {
-		return false
-	}
-
-	if asIdent.Name != "As" {
-		return false
-	}
-
-	return true
+	return query != nil && query.Fun.Sel.Name == "As" && gh.isCallTo(query.Fun.X.CallExpr, "github.com/tmr232/goat", "Describe")
 }
 
 func (gh *Goatherd) parseDescription(node ast.Node) (string, GoatDescription) {
-	asCall := node.(*ast.CallExpr)
-
-	describeArgs, _ := DigFor[[]ast.Expr](asCall, "Fun", "X", "Args")
+	describeArgs := python.GetAttr(node, "Fun.X.Args").([]ast.Expr)
 	ident := describeArgs[0].(*ast.Ident)
 	name := ident.Name
 	argType := gh.pkg.TypesInfo.TypeOf(ident)
@@ -290,7 +252,7 @@ func (gh *Goatherd) parseDescription(node ast.Node) (string, GoatDescription) {
 	}
 
 	var out bytes.Buffer
-	format.Node(&out, gh.pkg.Fset, asCall.Args[0])
+	format.Node(&out, gh.pkg.Fset, node.(*ast.CallExpr).Args[0])
 	flag := out.String()
 
 	return name, GoatDescription{Type: typ, Flag: flag, IsPtr: isPtr}
