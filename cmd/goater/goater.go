@@ -5,7 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/tmr232/goat"
-	"github.com/tmr232/goat/python"
+	"github.com/tmr232/goat/cmd/goater/python"
 	"go/ast"
 	"go/format"
 	"go/types"
