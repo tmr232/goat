@@ -5,6 +5,26 @@ import (
 	"strings"
 )
 
+func derefValue(value reflect.Value) reflect.Value {
+	for value.Kind() == reflect.Pointer || value.Kind() == reflect.Interface {
+		if value.IsNil() {
+			return reflect.Value{}
+		}
+		value = value.Elem()
+	}
+	return value
+}
+
+func deinterfaceValue(value reflect.Value) reflect.Value {
+	if value.Kind() == reflect.Interface {
+		if value.IsNil() {
+			return reflect.Value{}
+		}
+		return value.Elem()
+	}
+	return value
+}
+
 func lookupValue(obj any, attrs ...string) (value reflect.Value, found bool) {
 	if obj == nil {
 		return reflect.Value{}, false
@@ -110,24 +130,24 @@ func StructMatch[Query any](obj any) bool {
 
 func structQueryInternal(objValue reflect.Value, queryValue reflect.Value) bool {
 	queryType := queryValue.Type()
-	if queryType.Field(0).Type != objValue.Type() {
+	if queryValue.Type().Field(0).Type != objValue.Type() && deinterfaceValue(objValue).Type() != queryValue.Type().Field(0).Type {
 		return false
 	}
 
 	typeField := queryType.Field(0)
 	if typeField.Name != "_" {
-		queryValue.Field(0).Set(objValue)
+		queryValue.Field(0).Set(deinterfaceValue(objValue))
 	}
 
 	for i := 1; i < queryType.NumField(); i++ {
 		field := queryType.Field(i)
 
-		attr := objValue.FieldByName(field.Name)
+		attr := derefValue(objValue).FieldByName(field.Name)
 		if attr == *new(reflect.Value) {
 			return false
 		}
 
-		if field.Type.Name() != "" {
+		if field.Type.Name() != "" || field.Type.Kind() == reflect.Slice {
 			if field.Type != attr.Type() {
 				return false
 			} else {
