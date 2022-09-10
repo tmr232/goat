@@ -47,5 +47,6 @@ func main() {
 	goat.App("greeter",
 		goat.Command("hello", hello),
 		goat.Command("greet", greet),
+		goat.Command("app", app),
 	).Run()
 }
