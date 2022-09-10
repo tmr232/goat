@@ -103,7 +103,7 @@ func MapE[T any, R any](slice []T, op func(T) (R, error)) ([]R, error) {
 	return result, nil
 }
 
-func parseFluentDescription(fset *token.FileSet, chain FluentChain, getType func(ast.Node) (string, error)) (FluentDescription, error) {
+func parseFluentDescription(fset *token.FileSet, chain FluentChain, getType func(expr ast.Expr) (string, error)) (FluentDescription, error) {
 	if !isGoatFlag(chain) {
 		return FluentDescription{}, errors.New("Not a goat flag description!")
 	}
