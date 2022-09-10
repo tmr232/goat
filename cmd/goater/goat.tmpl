@@ -1,62 +1,37 @@
 {{define "goat-file"}}
-package {{.Package}}
+    package {{.Package}}
 
-import (
-    "github.com/urfave/cli"
+    import (
     "github.com/tmr232/goat"
-    "log"
-    "os"
+    "github.com/tmr232/goat/flags"
+    "github.com/urfave/cli"
     )
 
-{{template "register-apps" .}}
+    {{template "register-apps" .}}
 {{end}}
 
 {{define "register-apps"}}
-func init() {
-    {{range .Apps}}
-        goat.Register({{.Signature.Name}}, {{template "app-wrapper" .}})
+    func init() {
+    {{range .Actions}}
+        {{template "register-function" .}}
     {{end}}
-}
+    }
 {{end}}
 
-{{define "app-wrapper" -}}
-    func() {
-        {{template "cli-app" .}}
-    }
-{{- end}}
 
-{{define "cli-app"}}
-    {{range $name, $flag := .Flags}}
-        var {{$name}} {{$flag.Type}}
-    {{- end}}
-
-    __goatApp := &cli.App{
-        Flags: []cli.Flag{
-            {{range $name, $flag := .Flags}}
-                {{$flag.Flag}}.AsCliFlag("{{$name}}", &{{$name}}),
-            {{- end}}
-        },
-        Action: func(c *cli.Context) {
-        {{.Signature.Name}}(
-            {{ $base := . }}
-            {{- range $index, $arg := .Signature.Args -}}
-                {{- if $base.IsFlagPtr $arg.Name -}}
-                    goat.GetOptional(
-                        c,
-                        {{$base.GetFlag $arg.Name }}.CliName({{$arg.Name}}),
-                         &question,
-                         ),
-                {{else -}}
-                    {{$arg.Name}},
-                {{end -}}
-            {{- end}}
-        )
+{{define "register-function"}}
+    goat.Register({{.Function}}, goat.RunConfig{
+    Flags: []cli.Flag{
+    {{range .Flags}}
+        flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}).AsCliFlag(),
+    {{end}}
     },
-    }
-
-    __err := __goatApp.Run(os.Args)
-    if __err != nil {
-    log.Fatal(__err)
-    }
+    Action: func(c *cli.Context) error {
+    return {{.Function}}(
+    {{range .Flags}}
+        flags.GetFlag[{{.Type}}](c, {{.Name}}),
+    {{end}}
+    )
+    },
+    })
 {{end}}
-

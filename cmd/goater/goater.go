@@ -3,15 +3,14 @@ package main
 import (
 	"bytes"
 	_ "embed"
-	"fmt"
-	"github.com/tmr232/goat"
+	"github.com/pkg/errors"
 	"github.com/tmr232/goat/cmd/goater/python"
 	"go/ast"
 	"go/format"
 	"go/types"
 	"golang.org/x/tools/go/packages"
-	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 	"text/template"
 )
@@ -72,7 +71,10 @@ func (gh *Goatherd) Render(name string, data any) (string, error) {
 	return out.String(), nil
 }
 
-func (gh *Goatherd) isGoatRun(node ast.Node) bool {
+func (gh *Goatherd) isGoatRun(node *ast.CallExpr) bool {
+	if len(node.Args) != 1 {
+		return false
+	}
 	return gh.isCallTo(node, "github.com/tmr232/goat", "Run")
 }
 
@@ -98,21 +100,8 @@ func (gh *Goatherd) isCallTo(node ast.Node, pkgPath, name string) bool {
 	return found
 }
 
-func (gh *Goatherd) findGoatApps() (apps []*types.Func) {
-	var callArgs []ast.Expr
-	for _, syntax := range gh.pkg.Syntax {
-		for _, decl := range syntax.Decls {
-			ast.Inspect(decl, func(node ast.Node) bool {
-				if callExpr, isCall := node.(*ast.CallExpr); isCall {
-					if len(callExpr.Args) == 1 && gh.isGoatRun(callExpr) {
-						callArgs = append(callArgs, callExpr.Args[0])
-					}
-					return false
-				}
-				return true
-			})
-		}
-	}
+func (gh *Goatherd) findActionFunctions() (actionFunctions []*types.Func) {
+	callArgs := findActionCalls(gh)
 
 	// For the time being - only ast.Ident nodes will be considered valid because
 	// we need their base definition.
@@ -130,9 +119,36 @@ func (gh *Goatherd) findGoatApps() (apps []*types.Func) {
 		if !isFunction {
 			log.Fatalf("%s goat.Run expects a function.", gh.pkg.Fset.Position(arg.Pos()))
 		}
-		apps = append(apps, f)
+		actionFunctions = append(actionFunctions, f)
 	}
 	return
+}
+
+func findNodesIf[T ast.Node](file *ast.File, pred func(node T) bool) []T {
+	var matchingNodes []T
+	for _, decl := range file.Decls {
+		ast.Inspect(decl, func(node ast.Node) bool {
+			if typedNode, isRightType := node.(T); isRightType {
+				if pred(typedNode) {
+					matchingNodes = append(matchingNodes, typedNode)
+					// We only stop recursion if we match the predicate
+					return false
+				}
+			}
+			return true
+		})
+	}
+	return matchingNodes
+}
+
+func findActionCalls(gh *Goatherd) []ast.Expr {
+	var callArgs []ast.Expr
+	for _, syntax := range gh.pkg.Syntax {
+		for _, call := range findNodesIf[*ast.CallExpr](syntax, gh.isGoatRun) {
+			callArgs = append(callArgs, call.Args[0])
+		}
+	}
+	return callArgs
 }
 
 type GoatData struct {
@@ -188,38 +204,6 @@ func (app GoatApp) ArgNames() (names []string) {
 	return
 }
 
-func makeDefaultDescription(name, typ string) GoatDescription {
-	switch typ {
-	case "*int":
-		return GoatDescription{Type: typ, Flag: fmt.Sprintf("%#v", goat.OptionalIntFlag{})}
-	case "int":
-		return GoatDescription{Type: typ, Flag: fmt.Sprintf("%#v", goat.RequiredIntFlag{})}
-	case "*string":
-		return GoatDescription{Type: typ, Flag: fmt.Sprintf("%#v", goat.OptionalStringFlag{})}
-	case "string":
-		return GoatDescription{Type: typ, Flag: fmt.Sprintf("%#v", goat.RequiredStringFlag{})}
-	case "bool":
-		return GoatDescription{Type: typ, Flag: fmt.Sprintf("%#v", goat.BoolFlag{})}
-	}
-	log.Fatalf("Cannot describe type %s", typ)
-	return GoatDescription{}
-}
-
-func MakeApp(signature GoatSignature, descriptions map[string]GoatDescription) (app GoatApp) {
-	app.Signature = signature
-	app.Name = signature.Name
-	app.Flags = make(map[string]GoatDescription)
-	for _, arg := range signature.Args {
-		description, exists := descriptions[arg.Name]
-		if exists {
-			app.Flags[arg.Name] = description
-		} else {
-			app.Flags[arg.Name] = makeDefaultDescription(arg.Name, arg.Type)
-		}
-	}
-	return
-}
-
 func (gh *Goatherd) matchDescription(node ast.Node) bool {
 	query := python.StructQuery[struct {
 		_   *ast.CallExpr
@@ -236,6 +220,22 @@ func (gh *Goatherd) matchDescription(node ast.Node) bool {
 	}](node)
 
 	return query != nil && query.Fun.Sel.Name == "As" && gh.isCallTo(query.Fun.X.CallExpr, "github.com/tmr232/goat", "Describe")
+}
+
+func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FluentDescription, bool) {
+	chain := parseFluentChain(callExpr)
+	description, err := parseFluentDescription(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
+		argType := gh.pkg.TypesInfo.TypeOf(expr)
+		if argType == nil {
+			return "", errors.New("Failed to find type of expression.")
+		}
+		return argType.String(), nil
+	})
+	if err != nil {
+		log.Println(err)
+		return FluentDescription{}, false
+	}
+	return description, true
 }
 
 func (gh *Goatherd) parseDescription(node ast.Node) (string, GoatDescription) {
@@ -258,7 +258,32 @@ func (gh *Goatherd) parseDescription(node ast.Node) (string, GoatDescription) {
 	return name, GoatDescription{Type: typ, Flag: flag, IsPtr: isPtr}
 }
 
-func (gh *Goatherd) parseDescriptions(f *types.Func) map[string]GoatDescription {
+func (gh *Goatherd) parseDescriptions(f *types.Func) []FluentDescription {
+	fdecl := gh.findFuncDecl(f)
+
+	var descriptions []FluentDescription
+	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
+		callExpr, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			// Keep going!
+			return true
+		}
+		description, isOk := gh.parseArgDescription(callExpr)
+		if !isOk {
+			// Keep going
+			return true
+		}
+		descriptions = append(descriptions, description)
+
+		// Stop this branch
+		return false
+	})
+
+	return descriptions
+
+}
+
+func (gh *Goatherd) findFuncDecl(f *types.Func) *ast.FuncDecl {
 	var fdecl *ast.FuncDecl
 	for _, syntax := range gh.pkg.Syntax {
 		astObj := syntax.Scope.Lookup(f.Name())
@@ -278,19 +303,7 @@ func (gh *Goatherd) parseDescriptions(f *types.Func) map[string]GoatDescription 
 	if fdecl == nil {
 		log.Fatal("Failed to find app")
 	}
-
-	result := make(map[string]GoatDescription)
-	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
-		if !gh.matchDescription(node) {
-			return true
-		}
-		name, description := gh.parseDescription(node)
-		result[name] = description
-		return false
-	})
-
-	return result
-
+	return fdecl
 }
 
 func formatSource(src string) string {
@@ -305,23 +318,67 @@ func formatSource(src string) string {
 	return string(formattedSrc)
 }
 
+type Flag struct {
+	Type    string
+	Name    string
+	Usage   string
+	Default string
+}
+type Action struct {
+	Function string
+	Flags    []Flag
+}
+
+func makeAction(signature GoatSignature, descriptions []FluentDescription) Action {
+	var flags []Flag
+	for _, desc := range descriptions {
+		typ := desc.Type
+		name := "\"" + desc.Name + "\""
+		if dNames, hasName := desc.Descriptors["Name"]; hasName {
+			name = dNames[0]
+		}
+		usage := ""
+		if dUsage, hasUsage := desc.Descriptors["Usage"]; hasUsage {
+			usage = dUsage[0]
+		}
+		default_ := "nil"
+		if dDefault, hasDefault := desc.Descriptors["Default"]; hasDefault {
+			default_ = dDefault[0]
+		}
+		flags = append(flags, Flag{
+			Type:    typ,
+			Name:    name,
+			Usage:   usage,
+			Default: default_,
+		})
+	}
+	return Action{
+		Function: signature.Name,
+		Flags:    flags,
+	}
+}
+
 func main() {
 	gh := NewGoatherd(loadPackages())
-	data := GoatData{
-		Package: gh.pkg.Name,
+	var actions []Action
+	for _, actionFunc := range gh.findActionFunctions() {
+		signature := gh.parseSignature(actionFunc)
+		descriptions := gh.parseDescriptions(actionFunc)
+		actions = append(actions, makeAction(signature, descriptions))
 	}
-	for _, f := range gh.findGoatApps() {
-		signature := gh.parseSignature(f)
-		descriptions := gh.parseDescriptions(f)
-		app := MakeApp(signature, descriptions)
-		data.Apps = append(data.Apps, app)
+	data := struct {
+		Package string
+		Actions []Action
+	}{
+		Package: gh.pkg.Name,
+		Actions: actions,
 	}
 	file, err := gh.Render("goat-file", data)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = ioutil.WriteFile(data.Package+"_goat.go", []byte(formatSource(file)), 0644)
+	err = os.WriteFile(gh.pkg.Name+"_goat.go", []byte(formatSource(file)), 0644)
 	if err != nil {
 		log.Fatalf("writing output: %s", err)
 	}
