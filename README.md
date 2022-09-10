@@ -61,10 +61,16 @@ import (
 // (3) The app function signature
 func app(name string, goodbye bool, question *string, times int) {
 	// (4) Flag Descriptors
-	goat.Describe(name).As(goat.RequiredStringFlag{Usage: "The name to greet"})
-	goat.Describe(goodbye).As(goat.BoolFlag{Usage: "Enable to say Goodbye", Name: "bye"})
-	goat.Describe(question).As(goat.OptionalStringFlag{Usage: "Instead of a greeting, ask a question."})
-	goat.Describe(times).As(goat.DefaultIntFlag{Usage: "Number of repetitions", Default: 1})
+	goat.Flag(name).
+		Usage("The name to greet")
+	goat.Flag(goodbye).
+		Name("bye").
+		Usage("Enable to say Goodbye")
+	goat.Flag(question).
+		Usage("Instead of a greeting, ask a question.")
+	goat.Flag(times).
+		Usage("Number of repetitions").
+		Default(1)
 
 	for i := 0; i < times; i++ {
 		if question != nil {
