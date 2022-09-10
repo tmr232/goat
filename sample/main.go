@@ -33,6 +33,19 @@ func app(name string, goodbye bool, question *string, times int) error {
 	return nil
 }
 
+func hello() error {
+	fmt.Println("Hello, World!")
+	return nil
+}
+
+func greet(name string) error {
+	fmt.Printf("Hello, %s!\n", name)
+	return nil
+}
+
 func main() {
-	goat.Run(app)
+	goat.App("greeter",
+		goat.Command("hello", hello),
+		goat.Command("greet", greet),
+	).Run()
 }
