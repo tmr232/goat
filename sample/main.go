@@ -8,6 +8,9 @@ import (
 //go:generate go run github.com/tmr232/goat/cmd/goater
 
 func app(name string, goodbye bool, question *string, times int) error {
+	goat.Self().
+		Name("application").
+		Usage("usage")
 	goat.Flag(name).
 		Usage("The name to greet")
 	goat.Flag(goodbye).
