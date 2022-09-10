@@ -7,11 +7,17 @@ import (
 
 //go:generate go run github.com/tmr232/goat/cmd/goater
 
-func app(name string, goodbye bool, question *string, times int) {
-	goat.Describe(name).As(goat.RequiredStringFlag{Usage: "The name to greet"})
-	goat.Describe(goodbye).As(goat.BoolFlag{Usage: "Enable to say Goodbye", Name: "bye"})
-	goat.Describe(question).As(goat.OptionalStringFlag{Usage: "Instead of a greeting, ask a question."})
-	goat.Describe(times).As(goat.DefaultIntFlag{Usage: "Number of repetitions", Default: 1})
+func app(name string, goodbye bool, question *string, times int) error {
+	goat.Flag(name).
+		Usage("The name to greet")
+	goat.Flag(goodbye).
+		Name("bye").
+		Usage("say goodbye")
+	goat.Flag(question).
+		Usage("instead of greeting, ask a question")
+	goat.Flag(times).
+		Usage("Number of repetitions").
+		Default(1)
 
 	for i := 0; i < times; i++ {
 		if question != nil {
@@ -24,6 +30,7 @@ func app(name string, goodbye bool, question *string, times int) {
 			}
 		}
 	}
+	return nil
 }
 
 func main() {
