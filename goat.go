@@ -32,6 +32,30 @@ func Run(f any) error {
 	return app.Run(os.Args)
 }
 
+func Command(name string, f any) cli.Command {
+	config := registry[reflect.ValueOf(f)]
+
+	return cli.Command{
+		Flags:  config.Flags,
+		Action: config.Action,
+		Name:   name,
+	}
+}
+
+type Application struct{ *cli.App }
+
+func (app Application) Run() error {
+	return app.App.Run(os.Args)
+}
+func App(name string, commands ...cli.Command) Application {
+	return Application{
+		App: &cli.App{
+			Name:     name,
+			Commands: commands,
+		},
+	}
+}
+
 func Flag(any) FluentFlag {
 	return FluentFlag{}
 }
