@@ -7,14 +7,14 @@
     "github.com/urfave/cli"
     )
 
-    {{template "register-apps" .}}
+    {{- template "register-apps" .}}
 {{end}}
 
 {{define "register-apps"}}
     func init() {
-    {{range .Actions}}
-        {{template "register-function" .}}
-    {{end}}
+    {{- range .Actions}}
+        {{- template "register-function" . -}}
+    {{- end -}}
     }
 {{end}}
 
@@ -22,15 +22,15 @@
 {{define "register-function"}}
     goat.Register({{.Function}}, goat.RunConfig{
     Flags: []cli.Flag{
-    {{range .Flags}}
+    {{- range .Flags}}
         flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}).AsCliFlag(),
-    {{end}}
+    {{- end}}
     },
     Action: func(c *cli.Context) error {
     return {{.Function}}(
-    {{range .Flags}}
+    {{- range .Flags}}
         flags.GetFlag[{{.Type}}](c, {{.Name}}),
-    {{end}}
+    {{- end}}
     )
     },
     })
