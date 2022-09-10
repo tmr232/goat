@@ -296,38 +296,45 @@ type Flag struct {
 type Action struct {
 	Function string
 	Flags    []Flag
+	Name     string
+	Usage    string
+}
+
+func MakeFlag(typ string, name string, default_ string, usage string) Flag {
+	if usage == "" {
+		usage = "\"\""
+	}
+	if default_ == "" {
+		default_ = "nil"
+	}
+	return Flag{
+		Type:    typ,
+		Name:    "\"" + name + "\"",
+		Usage:   usage,
+		Default: default_,
+	}
 }
 
 func makeAction(signature GoatSignature, descriptions []FluentDescription) Action {
 	flagByArgName := make(map[string]Flag)
 	for _, arg := range signature.Args {
-		flagByArgName[arg.Name] = Flag{
-			Type:    arg.Type,
-			Name:    "\"" + arg.Name + "\"",
-			Default: "nil",
-			Usage:   "\"\"",
-		}
+		flagByArgName[arg.Name] = MakeFlag(arg.Type, arg.Name, "", "")
 	}
 	for _, desc := range descriptions {
 		typ := desc.Type
-		name := "\"" + desc.Name + "\""
+		name := desc.Name
 		if dNames, hasName := desc.Descriptors["Name"]; hasName {
 			name = dNames[0]
 		}
-		usage := "\"\""
+		usage := ""
 		if dUsage, hasUsage := desc.Descriptors["Usage"]; hasUsage {
 			usage = dUsage[0]
 		}
-		default_ := "nil"
+		default_ := ""
 		if dDefault, hasDefault := desc.Descriptors["Default"]; hasDefault {
 			default_ = dDefault[0]
 		}
-		flagByArgName[desc.Name] = Flag{
-			Type:    typ,
-			Name:    name,
-			Usage:   usage,
-			Default: default_,
-		}
+		flagByArgName[desc.Name] = MakeFlag(typ, name, usage, default_)
 	}
 	var flags []Flag
 	for _, flag := range flagByArgName {

@@ -9,6 +9,8 @@ import (
 type RunConfig struct {
 	Flags  []cli.Flag
 	Action cli.ActionFunc
+	Name   string
+	Usage  string
 }
 
 var registry map[reflect.Value]RunConfig
@@ -71,4 +73,17 @@ func (f FluentFlag) Usage(string) FluentFlag {
 }
 func (f FluentFlag) Default(any) FluentFlag {
 	return FluentFlag{}
+}
+
+type FluentSelf struct{}
+
+func (s FluentSelf) Name(string) FluentSelf {
+	return FluentSelf{}
+}
+func (s FluentSelf) Usage(string) FluentSelf {
+	return FluentSelf{}
+}
+
+func Self() FluentSelf {
+	return FluentSelf{}
 }
