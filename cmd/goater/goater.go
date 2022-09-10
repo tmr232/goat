@@ -151,11 +151,6 @@ func findActionCalls(gh *Goatherd) []ast.Expr {
 	return callArgs
 }
 
-type GoatData struct {
-	Package string
-	Apps    []GoatApp
-}
-
 type GoatArg struct {
 	Name string
 	Type string
@@ -182,44 +177,6 @@ type GoatDescription struct {
 	Type  string
 	Flag  string
 	IsPtr bool
-}
-type GoatApp struct {
-	Name      string // Name is app function
-	Signature GoatSignature
-	Flags     map[string]GoatDescription // The flags for the app. Should later be a type that isn't CLI bound...
-}
-
-func (app GoatApp) GetFlag(name string) string {
-	return app.Flags[name].Flag
-}
-
-func (app GoatApp) IsFlagPtr(name string) bool {
-	return app.Flags[name].IsPtr
-}
-
-func (app GoatApp) ArgNames() (names []string) {
-	for _, arg := range app.Signature.Args {
-		names = append(names, arg.Name)
-	}
-	return
-}
-
-func (gh *Goatherd) matchDescription(node ast.Node) bool {
-	query := python.StructQuery[struct {
-		_   *ast.CallExpr
-		Fun struct {
-			_ *ast.SelectorExpr
-			X struct {
-				*ast.CallExpr
-			}
-			Sel struct {
-				_    *ast.Ident
-				Name string
-			}
-		}
-	}](node)
-
-	return query != nil && query.Fun.Sel.Name == "As" && gh.isCallTo(query.Fun.X.CallExpr, "github.com/tmr232/goat", "Describe")
 }
 
 func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FluentDescription, bool) {
