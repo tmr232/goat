@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/tmr232/goat"
 )
 
@@ -46,6 +47,11 @@ func greet(name string) error {
 	return nil
 }
 
+func fail(msg string) error {
+	goat.Flag(msg).Default("default error")
+	return errors.New(msg)
+}
+
 func main() {
 	goat.App("greeter",
 		// TODO: naming of commands should be done using command-descriptors in the function body.
@@ -53,6 +59,7 @@ func main() {
 		//		The values of those should be added to the runconfig registry.
 		goat.Command("hello", hello),
 		goat.Command("greet", greet),
+		goat.Command("error", fail),
 		goat.Command("app", app),
 	).Run()
 }

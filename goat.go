@@ -2,6 +2,7 @@ package goat
 
 import (
 	"github.com/urfave/cli"
+	"log"
 	"os"
 	"reflect"
 )
@@ -9,8 +10,6 @@ import (
 type RunConfig struct {
 	Flags  []cli.Flag
 	Action cli.ActionFunc
-	Name   string
-	Usage  string
 }
 
 var registry map[reflect.Value]RunConfig
@@ -23,7 +22,7 @@ func Register(app any, config RunConfig) {
 	registry[reflect.ValueOf(app)] = config
 }
 
-func Run(f any) error {
+func RunE(f any) error {
 	config := registry[reflect.ValueOf(f)]
 
 	app := &cli.App{
@@ -32,6 +31,13 @@ func Run(f any) error {
 	}
 
 	return app.Run(os.Args)
+}
+
+func Run(f any) {
+	err := RunE(f)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func Command(name string, f any) cli.Command {
@@ -46,8 +52,14 @@ func Command(name string, f any) cli.Command {
 
 type Application struct{ *cli.App }
 
-func (app Application) Run() error {
+func (app Application) RunE() error {
 	return app.App.Run(os.Args)
+}
+func (app Application) Run() {
+	err := app.App.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 func App(name string, commands ...cli.Command) Application {
 	return Application{

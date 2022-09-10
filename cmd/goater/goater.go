@@ -75,7 +75,8 @@ func (gh *Goatherd) isGoatRun(node *ast.CallExpr) bool {
 	if len(node.Args) != 1 {
 		return false
 	}
-	return gh.isCallTo(node, "github.com/tmr232/goat", "Run")
+	return gh.isCallTo(node, "github.com/tmr232/goat", "RunE") ||
+		gh.isCallTo(node, "github.com/tmr232/goat", "Run")
 }
 func (gh *Goatherd) isGoatCommand(node *ast.CallExpr) bool {
 	if len(node.Args) != 2 {
@@ -90,25 +91,23 @@ func (gh *Goatherd) isCallTo(node ast.Node, pkgPath, name string) bool {
 		return false
 	}
 
-	var ident *ast.Ident
-	switch fun := callExpr.Fun.(type) {
-	case *ast.Ident:
-		ident = fun
-	case *ast.SelectorExpr:
-		ident = fun.Sel
-	default:
-		return false
-	}
-
-	uses, exists := gh.pkg.TypesInfo.Uses[ident]
-	if !exists {
-		return false
-	}
-	if uses.Pkg() == nil {
-		return false
-	}
-
-	return uses.Pkg().Path() == pkgPath && uses.Name() == name
+	found := false
+	ast.Inspect(callExpr.Fun, func(node ast.Node) bool {
+		if ident, isIdent := node.(*ast.Ident); isIdent {
+			uses, exists := gh.pkg.TypesInfo.Uses[ident]
+			if !exists {
+				return false
+			}
+			if uses.Pkg() == nil {
+				return false
+			}
+			if uses.Pkg().Path() == pkgPath && uses.Name() == name {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
 }
 
 func (gh *Goatherd) findActionFunctions() (actionFunctions []*types.Func) {
@@ -298,49 +297,42 @@ type Flag struct {
 type Action struct {
 	Function string
 	Flags    []Flag
-	Name     string
-	Usage    string
-}
-
-func MakeFlag(typ string, name string, default_ string, usage string) Flag {
-	if usage == "" {
-		usage = "\"\""
-	}
-	if default_ == "" {
-		default_ = "nil"
-	}
-	name = strings.Trim(name, "\"")
-	return Flag{
-		Type:    typ,
-		Name:    "\"" + name + "\"",
-		Usage:   usage,
-		Default: default_,
-	}
 }
 
 func makeAction(signature GoatSignature, descriptions []FluentDescription) Action {
 	flagByArgName := make(map[string]Flag)
 	for _, arg := range signature.Args {
-		flagByArgName[arg.Name] = MakeFlag(arg.Type, arg.Name, "", "")
+		flagByArgName[arg.Name] = Flag{
+			Type:    arg.Type,
+			Name:    "\"" + arg.Name + "\"",
+			Default: "nil",
+			Usage:   "\"\"",
+		}
 	}
 	for _, desc := range descriptions {
 		typ := desc.Type
-		name := desc.Name
+		name := "\"" + desc.Name + "\""
 		if dNames, hasName := desc.Descriptors["Name"]; hasName {
 			name = dNames[0]
 		}
-		usage := ""
+		usage := "\"\""
 		if dUsage, hasUsage := desc.Descriptors["Usage"]; hasUsage {
 			usage = dUsage[0]
 		}
-		default_ := ""
+		default_ := "nil"
 		if dDefault, hasDefault := desc.Descriptors["Default"]; hasDefault {
 			default_ = dDefault[0]
 		}
-		flagByArgName[desc.Name] = MakeFlag(typ, name, usage, default_)
+		flagByArgName[desc.Name] = Flag{
+			Type:    typ,
+			Name:    name,
+			Usage:   usage,
+			Default: default_,
+		}
 	}
 	var flags []Flag
-	for _, flag := range flagByArgName {
+	for _, arg := range signature.Args {
+		flag := flagByArgName[arg.Name]
 		flags = append(flags, flag)
 	}
 	return Action{
