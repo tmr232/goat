@@ -36,22 +36,9 @@ func Test_parseFluentDescription(t *testing.T) {
 	fmt.Println(description)
 }
 
-//func Test_parseFluentChain(t *testing.T) {
-//	type args struct {
-//		call *ast.CallExpr
-//	}
-//	tests := []struct {
-//		name string
-//		args args
-//		want FluentChain
-//	}{
-//		// TODO: Add test cases.
-//	}
-//	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//			if got := parseFluentChain(tt.args.call); !reflect.DeepEqual(got, tt.want) {
-//				t.Errorf("parseFluentChain() = %v, want %v", got, tt.want)
-//			}
-//		})
-//	}
-//}
+func Test_structGen(t *testing.T) {
+	fmt.Printf("%#v\n", struct {
+		name string
+		Name string
+	}{"a", "b"})
+}
