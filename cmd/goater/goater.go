@@ -90,23 +90,25 @@ func (gh *Goatherd) isCallTo(node ast.Node, pkgPath, name string) bool {
 		return false
 	}
 
-	found := false
-	ast.Inspect(callExpr.Fun, func(node ast.Node) bool {
-		if ident, isIdent := node.(*ast.Ident); isIdent {
-			uses, exists := gh.pkg.TypesInfo.Uses[ident]
-			if !exists {
-				return false
-			}
-			if uses.Pkg() == nil {
-				return false
-			}
-			if uses.Pkg().Path() == pkgPath && uses.Name() == name {
-				found = true
-			}
-		}
-		return !found
-	})
-	return found
+	var ident *ast.Ident
+	switch fun := callExpr.Fun.(type) {
+	case *ast.Ident:
+		ident = fun
+	case *ast.SelectorExpr:
+		ident = fun.Sel
+	default:
+		return false
+	}
+
+	uses, exists := gh.pkg.TypesInfo.Uses[ident]
+	if !exists {
+		return false
+	}
+	if uses.Pkg() == nil {
+		return false
+	}
+
+	return uses.Pkg().Path() == pkgPath && uses.Name() == name
 }
 
 func (gh *Goatherd) findActionFunctions() (actionFunctions []*types.Func) {
@@ -307,6 +309,7 @@ func MakeFlag(typ string, name string, default_ string, usage string) Flag {
 	if default_ == "" {
 		default_ = "nil"
 	}
+	name = strings.Trim(name, "\"")
 	return Flag{
 		Type:    typ,
 		Name:    "\"" + name + "\"",
