@@ -16,9 +16,9 @@ func app(name string, goodbye bool, question *string, times int) error {
 		Usage("The name to greet")
 	goat.Flag(goodbye).
 		Name("bye").
-		Usage("say goodbye")
+		Usage("Enable to say Goodbye")
 	goat.Flag(question).
-		Usage("instead of greeting, ask a question")
+		Usage("Instead of a greeting, ask a question.")
 	goat.Flag(times).
 		Usage("Number of repetitions").
 		Default(1)
