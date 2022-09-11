@@ -127,33 +127,18 @@ If an argument is not a pointer, it'll be a required flag.
 
 A name and a type for a flag are nice, but hardly enough.
 We may want to define aliases, usage strings, or default values.
-To do this - we "describe" our flags as follows:
+To do this - we describe our flags as follows:
 
 ```go
-//             A                    B            C
-goat.Describe(name).As(goat.RequiredStringFlag{Usage: "The name to greet"})
+goat.Flag(name).
+	Usage("The name to greet")
 ```
 
-**A** will be the actual function parameter.<br>
-**B** is the flag type (notice that it must match the parameter type)
-**C** is where the description fields go
+You can use the following to add data to your flags:
 
-The `goat.Describe(T).As(Flag[T])` syntax is used to enforce matching types using generics.
-During code generation, those calls are parsed to extract the flag information.
-At runtime, both `Describe` and `As` are essentially no-ops.
-
-#### Flag Types
-
-For each argument type (excepting `bool`) we have 3 flag types:
-
-- `RequiredXXXFlag`: Requires that the flag be provided by the user. 
-    This is what you get if you don't describe your flags. 
-- `DefaultXXXFlag`: Provides a default value, and allows the user to change it.
-- `OptionalXXXFlag`: The only option for pointer variables.
-    Will ensure that `nil` is received if the flag was not set by the user.
-
-For `bool` arguments, we support only `BoolFlag`. 
-It is a `Default` style flag, so you can decide whether you go with default-true or default-false. 
+1. `Usage(string)` - add a usage string
+2. `Name(string)` - set the name of the flag
+3. `Default(any)` - set the flag's default value. Works only with non-pointer flags.
 
 ## Dependencies
 
