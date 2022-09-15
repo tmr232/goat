@@ -55,6 +55,69 @@ func parseFluentChain(call *ast.CallExpr) FluentChain {
 
 }
 
+type ActionDescription struct {
+	Name  *string
+	Usage *string
+}
+
+func isActionDescription(chain FluentChain) bool {
+	base, isIdent := chain.Base.(*ast.Ident)
+	if !isIdent {
+		return false
+	}
+	if base.Name != "goat" {
+		return false
+	}
+	if chain.Calls[0].Name != "Self" {
+		return false
+	}
+	return true
+}
+
+func parseActionDescription(fset *token.FileSet, chain FluentChain, reportError func(ast.Node, string)) (ActionDescription, error) {
+	description := ActionDescription{}
+
+	for _, call := range chain.Calls[1:] {
+		switch call.Name {
+		case "Name":
+			if description.Name != nil {
+				reportError(call.Ident, "duplicate directive: .Name(name)")
+				return ActionDescription{}, errors.New("Duplicate Name directive found")
+			}
+			if len(call.Args) != 1 {
+				reportError(call.Ident, "Too many arguments passed to .Name(name)")
+			}
+			name, err := formatNode(fset, call.Args[0])
+			if err != nil {
+				reportError(call.Args[0], "Failed handling argument to .Name(name)")
+				return ActionDescription{}, errors.Wrap(err, "Failed formatting argument")
+			}
+			description.Name = &name
+
+		case "Usage":
+			if description.Usage != nil {
+				reportError(call.Ident, "duplicate directive: .Usage(usage)")
+				return ActionDescription{}, errors.New("Duplicate Usage directive found")
+			}
+			if len(call.Args) != 1 {
+				reportError(call.Ident, "Too many arguments passed to .Usage(usage)")
+			}
+			usage, err := formatNode(fset, call.Args[0])
+			if err != nil {
+				reportError(call.Args[0], "Failed handling argument to .Usage(usage)")
+				return ActionDescription{}, errors.Wrap(err, "Failed formatting argument")
+			}
+			description.Usage = &usage
+
+		default:
+			reportError(call.Ident, "Unrecognized directive: "+call.Name)
+			return ActionDescription{}, errors.New("unrecognized directive")
+		}
+	}
+
+	return description, nil
+}
+
 type FlagDescription struct {
 	Id      string
 	Type    string

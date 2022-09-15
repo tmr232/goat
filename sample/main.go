@@ -16,7 +16,6 @@ func app(name string, goodbye bool, question *string, times int) error {
 		Usage("The name to greet")
 	goat.Flag(goodbye).
 		Name("bye").
-		Name("no").
 		Usage("Enable to say Goodbye")
 	goat.Flag(question).
 		Usage("Instead of a greeting, ask a question.")
@@ -58,9 +57,9 @@ func main() {
 		// TODO: naming of commands should be done using command-descriptors in the function body.
 		//		specifically - `goat.Name` and `goat.Usage`.
 		//		The values of those should be added to the runconfig registry.
-		goat.Command("hello", hello),
-		goat.Command("greet", greet),
-		goat.Command("error", fail),
-		goat.Command("app", app),
+		goat.Command(hello),
+		goat.Command(greet),
+		goat.Command(fail),
+		goat.Command(app),
 	).Run()
 }

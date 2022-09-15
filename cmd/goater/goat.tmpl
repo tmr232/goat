@@ -26,6 +26,8 @@
         flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}).AsCliFlag(),
     {{- end}}
     },
+    Name: {{.Name}},
+    Usage: {{.Usage}},
     Action: func(c *cli.Context) error {
     return {{.Function}}(
     {{- range .Flags}}
