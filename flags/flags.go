@@ -1,7 +1,7 @@
 package flags
 
 import (
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
 func tryDeref[T any](ptr *T) T {
@@ -22,7 +22,7 @@ type DefaultIntFlag struct {
 }
 
 func (flag DefaultIntFlag) AsCliFlag() cli.Flag {
-	return cli.IntFlag{
+	return &cli.IntFlag{
 		Name:  flag.Name,
 		Usage: flag.Usage,
 		Value: flag.Default,
@@ -35,7 +35,7 @@ type RequiredIntFlag struct {
 }
 
 func (flag RequiredIntFlag) AsCliFlag() cli.Flag {
-	return cli.IntFlag{
+	return &cli.IntFlag{
 		Name:     flag.Name,
 		Usage:    flag.Usage,
 		Required: true,
@@ -48,7 +48,7 @@ type OptionalIntFlag struct {
 }
 
 func (flag OptionalIntFlag) AsCliFlag() cli.Flag {
-	return cli.IntFlag{
+	return &cli.IntFlag{
 		Name:     flag.Name,
 		Usage:    flag.Usage,
 		Required: false,
@@ -62,7 +62,7 @@ type DefaultStringFlag struct {
 }
 
 func (flag DefaultStringFlag) AsCliFlag() cli.Flag {
-	return cli.StringFlag{
+	return &cli.StringFlag{
 		Name:  flag.Name,
 		Usage: flag.Usage,
 		Value: flag.Default,
@@ -75,7 +75,7 @@ type RequiredStringFlag struct {
 }
 
 func (flag RequiredStringFlag) AsCliFlag() cli.Flag {
-	return cli.StringFlag{
+	return &cli.StringFlag{
 		Name:     flag.Name,
 		Usage:    flag.Usage,
 		Required: true,
@@ -88,7 +88,7 @@ type OptionalStringFlag struct {
 }
 
 func (flag OptionalStringFlag) AsCliFlag() cli.Flag {
-	return cli.StringFlag{
+	return &cli.StringFlag{
 		Name:     flag.Name,
 		Usage:    flag.Usage,
 		Required: false,
@@ -102,15 +102,10 @@ type BoolFlag struct {
 }
 
 func (flag BoolFlag) AsCliFlag() cli.Flag {
-	if flag.Default {
-		return cli.BoolTFlag{
-			Name:  flag.Name,
-			Usage: flag.Usage,
-		}
-	}
-	return cli.BoolFlag{
+	return &cli.BoolFlag{
 		Name:  flag.Name,
 		Usage: flag.Usage,
+		Value: flag.Default,
 	}
 }
 
