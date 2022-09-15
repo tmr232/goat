@@ -55,7 +55,15 @@ func parseFluentChain(call *ast.CallExpr) FluentChain {
 
 }
 
-func isGoatFlag(chain FluentChain) bool {
+type FlagDescription struct {
+	Id      string
+	Type    string
+	Name    *string
+	Usage   *string
+	Default *string
+}
+
+func isFlagDescription(chain FluentChain) bool {
 	base, isIdent := chain.Base.(*ast.Ident)
 	if !isIdent {
 		return false
@@ -69,16 +77,8 @@ func isGoatFlag(chain FluentChain) bool {
 	return true
 }
 
-type FlagDescription struct {
-	Id      string
-	Type    string
-	Name    *string
-	Usage   *string
-	Default *string
-}
-
 func parseFlagDesciption(fset *token.FileSet, chain FluentChain, getType func(expr ast.Expr) (string, error)) (FlagDescription, error) {
-	if !isGoatFlag(chain) {
+	if !isFlagDescription(chain) {
 		return FlagDescription{}, errors.New("Not a goat flag description!")
 	}
 
