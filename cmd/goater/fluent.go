@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/pkg/errors"
 	"go/ast"
 	"go/format"
@@ -10,8 +9,9 @@ import (
 )
 
 type FluentCall struct {
-	Name string
-	Args []ast.Expr
+	Name  string
+	Args  []ast.Expr
+	Ident *ast.Ident
 }
 
 type FluentChain struct {
@@ -35,10 +35,10 @@ func parseFluentChain(call *ast.CallExpr) FluentChain {
 		selector, _ = call.Fun.(*ast.SelectorExpr)
 		args := call.Args
 		name := selector.Sel.Name
-		fmt.Println(name, args)
 		calls = append(calls, FluentCall{
-			Name: name,
-			Args: args,
+			Name:  name,
+			Args:  args,
+			Ident: selector.Sel,
 		})
 		newCall, isCall := selector.X.(*ast.CallExpr)
 		if !isCall {
@@ -78,10 +78,6 @@ func isFlagDescription(chain FluentChain) bool {
 }
 
 func parseFlagDesciption(fset *token.FileSet, chain FluentChain, getType func(expr ast.Expr) (string, error)) (FlagDescription, error) {
-	if !isFlagDescription(chain) {
-		return FlagDescription{}, errors.New("Not a goat flag description!")
-	}
-
 	id, err := formatNode(fset, chain.Calls[0].Args[0])
 	if err != nil {
 		return FlagDescription{}, errors.Wrap(err, "Could not format id node")
@@ -97,7 +93,7 @@ func parseFlagDesciption(fset *token.FileSet, chain FluentChain, getType func(ex
 		switch call.Name {
 		case "Name":
 			if description.Name != nil {
-				return FlagDescription{}, errors.New("Duplicate name directive found")
+				return FlagDescription{}, errors.New("Duplicate name directive found at " + fset.Position(call.Ident.Pos()).String())
 			}
 			name, err := formatNode(fset, call.Args[0])
 			if err != nil {
