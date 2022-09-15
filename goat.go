@@ -8,8 +8,13 @@ import (
 )
 
 type RunConfig struct {
-	Flags  []cli.Flag
+	Flags []cli.Flag
+	// TODO: Replace this with a function that takes the action function and returns ActionFunc
+	//		 This is needed for supporting function literals instead of named functions.
+	//		 This is also required for anything beyond named functions.
 	Action cli.ActionFunc
+	Name   string
+	Usage  string
 }
 
 var registry map[reflect.Value]RunConfig
@@ -28,6 +33,8 @@ func RunE(f any) error {
 	app := &cli.App{
 		Flags:  config.Flags,
 		Action: config.Action,
+		Name:   config.Name,
+		Usage:  config.Usage,
 	}
 
 	return app.Run(os.Args)
@@ -40,13 +47,14 @@ func Run(f any) {
 	}
 }
 
-func Command(name string, f any) *cli.Command {
+func Command(f any) *cli.Command {
 	config := registry[reflect.ValueOf(f)]
 
 	return &cli.Command{
 		Flags:  config.Flags,
 		Action: config.Action,
-		Name:   name,
+		Name:   config.Name,
+		Usage:  config.Usage,
 	}
 }
 

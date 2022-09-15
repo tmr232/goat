@@ -11,6 +11,7 @@ import (
 	"golang.org/x/tools/go/packages"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 	"text/template"
 )
@@ -119,6 +120,10 @@ func (gh *Goatherd) findActionFunctions() (actionFunctions []*types.Func) {
 	for _, arg := range callArgs {
 		ident, isIdent := arg.(*ast.Ident)
 		if !isIdent {
+			funcLit := arg.(*ast.FuncLit)
+			fmt.Println(gh.pkg.TypesInfo.TypeOf(funcLit))
+			fmt.Println(reflect.TypeOf(gh.pkg.TypesInfo.TypeOf(funcLit)))
+			fmt.Println(gh.pkg.TypesInfo.TypeOf(funcLit).(*types.Signature))
 			log.Fatalf("%s goat.Run only accepts free functions.", gh.pkg.Fset.Position(arg.Pos()))
 		}
 		definition, exists := gh.pkg.TypesInfo.Uses[ident]
@@ -188,28 +193,38 @@ func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature) {
 
 var notAFlagDescription = errors.New("Not a flag description")
 
-func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FlagDescription, error) {
-	chain := parseFluentChain(callExpr)
-	if !isFlagDescription(chain) {
-		return FlagDescription{}, notAFlagDescription
-	}
-	description, err := parseFlagDescription(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
-		argType := gh.pkg.TypesInfo.TypeOf(expr)
-		if argType == nil {
-			return "", errors.New("Failed to find type of expression.")
+func (gh *Goatherd) reportError(node ast.Node, message string) {
+	fmt.Println(gh.pkg.Fset.Position(node.Pos()), "Error:", message)
+}
+func (gh *Goatherd) parseActionDescription(f *types.Func) (ActionDescription, error) {
+	fdecl := gh.findFuncDecl(f)
+
+	var description ActionDescription
+	var err error
+	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
+		callExpr, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			// Keep going!
+			return true
 		}
-		return argType.String(), nil
-	},
-		func(node ast.Node, message string) {
-			fmt.Println(gh.pkg.Fset.Position(node.Pos()), "Error:", message)
-		})
+		chain := parseFluentChain(callExpr)
+		if !isActionDescription(chain) {
+			// Keep going
+			return true
+		}
+		description, err = parseActionDescription(gh.pkg.Fset, chain, gh.reportError)
+		// Stop this branch
+		return false
+	})
+
 	if err != nil {
-		return FlagDescription{}, err
+		return ActionDescription{}, errors.Wrap(err, "Failed parsing ActionDescription")
 	}
 	return description, nil
+
 }
 
-func (gh *Goatherd) parseDescriptions(f *types.Func) ([]FlagDescription, error) {
+func (gh *Goatherd) parseFlagDescriptions(f *types.Func) ([]FlagDescription, error) {
 	fdecl := gh.findFuncDecl(f)
 
 	var parseErrors []error
@@ -221,7 +236,7 @@ func (gh *Goatherd) parseDescriptions(f *types.Func) ([]FlagDescription, error) 
 			// Keep going!
 			return true
 		}
-		description, err := gh.parseArgDescription(callExpr)
+		description, err := gh.parseFlagDescription(callExpr)
 		if err == notAFlagDescription {
 			// Keep going
 			return true
@@ -240,6 +255,24 @@ func (gh *Goatherd) parseDescriptions(f *types.Func) ([]FlagDescription, error) 
 	}
 	return descriptions, nil
 
+}
+func (gh *Goatherd) parseFlagDescription(callExpr *ast.CallExpr) (FlagDescription, error) {
+	chain := parseFluentChain(callExpr)
+	if !isFlagDescription(chain) {
+		return FlagDescription{}, notAFlagDescription
+	}
+	description, err := parseFlagDescription(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
+		argType := gh.pkg.TypesInfo.TypeOf(expr)
+		if argType == nil {
+			return "", errors.New("Failed to find type of expression.")
+		}
+		return argType.String(), nil
+	},
+		gh.reportError)
+	if err != nil {
+		return FlagDescription{}, err
+	}
+	return description, nil
 }
 
 func (gh *Goatherd) findFuncDecl(f *types.Func) *ast.FuncDecl {
@@ -286,9 +319,11 @@ type Flag struct {
 type Action struct {
 	Function string
 	Flags    []Flag
+	Name     string
+	Usage    string
 }
 
-func makeAction(signature GoatSignature, descriptions []FlagDescription) Action {
+func makeAction(signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
 	flagByArgName := make(map[string]Flag)
 	for _, arg := range signature.Args {
 		flagByArgName[arg.Name] = Flag{
@@ -298,7 +333,7 @@ func makeAction(signature GoatSignature, descriptions []FlagDescription) Action 
 			Usage:   "\"\"",
 		}
 	}
-	for _, desc := range descriptions {
+	for _, desc := range flagDescriptions {
 		typ := desc.Type
 		name := "\"" + desc.Id + "\""
 		if desc.Name != nil {
@@ -324,9 +359,21 @@ func makeAction(signature GoatSignature, descriptions []FlagDescription) Action 
 		flag := flagByArgName[arg.Name]
 		flags = append(flags, flag)
 	}
+
+	name := "\"" + signature.Name + "\""
+	if actionDescription.Name != nil {
+		name = *actionDescription.Name
+	}
+	usage := "\"\""
+	if actionDescription.Usage != nil {
+		usage = *actionDescription.Usage
+	}
+
 	return Action{
 		Function: signature.Name,
 		Flags:    flags,
+		Name:     name,
+		Usage:    usage,
 	}
 }
 
@@ -335,11 +382,15 @@ func main() {
 	var actions []Action
 	for _, actionFunc := range gh.findActionFunctions() {
 		signature := gh.parseSignature(actionFunc)
-		descriptions, err := gh.parseDescriptions(actionFunc)
+		actionDescription, err := gh.parseActionDescription(actionFunc)
 		if err != nil {
 			log.Fatal(err)
 		}
-		actions = append(actions, makeAction(signature, descriptions))
+		flagDescriptions, err := gh.parseFlagDescriptions(actionFunc)
+		if err != nil {
+			log.Fatal(err)
+		}
+		actions = append(actions, makeAction(signature, actionDescription, flagDescriptions))
 	}
 	data := struct {
 		Package string
