@@ -54,9 +54,6 @@ func fail(msg string) error {
 
 func main() {
 	goat.App("greeter",
-		// TODO: naming of commands should be done using command-descriptors in the function body.
-		//		specifically - `goat.Name` and `goat.Usage`.
-		//		The values of those should be added to the runconfig registry.
 		goat.Command(hello),
 		goat.Command(greet),
 		goat.Command(fail),
