@@ -4,7 +4,6 @@ import (
 	"bytes"
 	_ "embed"
 	"github.com/pkg/errors"
-	"github.com/tmr232/goat/cmd/goater/python"
 	"go/ast"
 	"go/format"
 	"go/types"
@@ -186,15 +185,9 @@ func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature) {
 	return
 }
 
-type GoatDescription struct {
-	Type  string
-	Flag  string
-	IsPtr bool
-}
-
-func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FluentDescription, bool) {
+func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FlagDescription, bool) {
 	chain := parseFluentChain(callExpr)
-	description, err := parseFluentDescription(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
+	description, err := parseFlagDesciption(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
 		argType := gh.pkg.TypesInfo.TypeOf(expr)
 		if argType == nil {
 			return "", errors.New("Failed to find type of expression.")
@@ -203,35 +196,15 @@ func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FluentDescripti
 	})
 	if err != nil {
 		log.Println(err)
-		return FluentDescription{}, false
+		return FlagDescription{}, false
 	}
 	return description, true
 }
 
-func (gh *Goatherd) parseDescription(node ast.Node) (string, GoatDescription) {
-	describeArgs := python.GetAttr(node, "Fun.X.Args").([]ast.Expr)
-	ident := describeArgs[0].(*ast.Ident)
-	name := ident.Name
-	argType := gh.pkg.TypesInfo.TypeOf(ident)
-	ptrType, isPtr := argType.(*types.Pointer)
-	var typ string
-	if isPtr {
-		typ = ptrType.Elem().String()
-	} else {
-		typ = argType.String()
-	}
-
-	var out bytes.Buffer
-	format.Node(&out, gh.pkg.Fset, node.(*ast.CallExpr).Args[0])
-	flag := out.String()
-
-	return name, GoatDescription{Type: typ, Flag: flag, IsPtr: isPtr}
-}
-
-func (gh *Goatherd) parseDescriptions(f *types.Func) []FluentDescription {
+func (gh *Goatherd) parseDescriptions(f *types.Func) []FlagDescription {
 	fdecl := gh.findFuncDecl(f)
 
-	var descriptions []FluentDescription
+	var descriptions []FlagDescription
 	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
 		callExpr, isCall := node.(*ast.CallExpr)
 		if !isCall {
@@ -299,7 +272,7 @@ type Action struct {
 	Flags    []Flag
 }
 
-func makeAction(signature GoatSignature, descriptions []FluentDescription) Action {
+func makeAction(signature GoatSignature, descriptions []FlagDescription) Action {
 	flagByArgName := make(map[string]Flag)
 	for _, arg := range signature.Args {
 		flagByArgName[arg.Name] = Flag{
@@ -311,19 +284,19 @@ func makeAction(signature GoatSignature, descriptions []FluentDescription) Actio
 	}
 	for _, desc := range descriptions {
 		typ := desc.Type
-		name := "\"" + desc.Name + "\""
-		if dNames, hasName := desc.Descriptors["Name"]; hasName {
-			name = dNames[0]
+		name := "\"" + desc.Id + "\""
+		if desc.Name != nil {
+			name = *desc.Name
 		}
 		usage := "\"\""
-		if dUsage, hasUsage := desc.Descriptors["Usage"]; hasUsage {
-			usage = dUsage[0]
+		if desc.Usage != nil {
+			usage = *desc.Usage
 		}
 		default_ := "nil"
-		if dDefault, hasDefault := desc.Descriptors["Default"]; hasDefault {
-			default_ = dDefault[0]
+		if desc.Default != nil {
+			default_ = *desc.Default
 		}
-		flagByArgName[desc.Name] = Flag{
+		flagByArgName[desc.Id] = Flag{
 			Type:    typ,
 			Name:    name,
 			Usage:   usage,

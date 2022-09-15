@@ -69,38 +69,63 @@ func isGoatFlag(chain FluentChain) bool {
 	return true
 }
 
-type FluentDescription struct {
-	Name        string
-	Type        string
-	Descriptors map[string][]string
+type FlagDescription struct {
+	Id      string
+	Type    string
+	Name    *string
+	Usage   *string
+	Default *string
 }
 
-func parseFluentDescription(fset *token.FileSet, chain FluentChain, getType func(expr ast.Expr) (string, error)) (FluentDescription, error) {
+func parseFlagDesciption(fset *token.FileSet, chain FluentChain, getType func(expr ast.Expr) (string, error)) (FlagDescription, error) {
 	if !isGoatFlag(chain) {
-		return FluentDescription{}, errors.New("Not a goat flag description!")
+		return FlagDescription{}, errors.New("Not a goat flag description!")
 	}
 
-	name, err := formatNode(fset, chain.Calls[0].Args[0])
+	id, err := formatNode(fset, chain.Calls[0].Args[0])
 	if err != nil {
-		return FluentDescription{}, errors.Wrap(err, "Could not format name node")
+		return FlagDescription{}, errors.Wrap(err, "Could not format id node")
 	}
 	typ, err := getType(chain.Calls[0].Args[0])
 	if err != nil {
-		return FluentDescription{}, errors.Wrap(err, "Failed getting name type")
+		return FlagDescription{}, errors.Wrap(err, "Failed getting id type")
 	}
 
-	descriptors := make(map[string][]string, len(chain.Calls)-1)
+	description := FlagDescription{Id: id, Type: typ}
+
 	for _, call := range chain.Calls[1:] {
-		args, err := MapE(call.Args, func(node ast.Expr) (string, error) { return formatNode(fset, node) })
-		if err != nil {
-			return FluentDescription{}, errors.Wrap(err, "Failed converting args to strings")
+		switch call.Name {
+		case "Name":
+			if description.Name != nil {
+				return FlagDescription{}, errors.New("Duplicate name directive found")
+			}
+			name, err := formatNode(fset, call.Args[0])
+			if err != nil {
+				return FlagDescription{}, errors.Wrap(err, "Failed formatting argument")
+			}
+			description.Name = &name
+
+		case "Usage":
+			if description.Usage != nil {
+				return FlagDescription{}, errors.New("Duplicate usage directive found")
+			}
+			name, err := formatNode(fset, call.Args[0])
+			if err != nil {
+				return FlagDescription{}, errors.Wrap(err, "Failed formatting argument")
+			}
+			description.Usage = &name
+
+		case "Default":
+			if description.Default != nil {
+				return FlagDescription{}, errors.New("Duplicate default directive found")
+			}
+			name, err := formatNode(fset, call.Args[0])
+			if err != nil {
+				return FlagDescription{}, errors.Wrap(err, "Failed formatting argument")
+			}
+			description.Default = &name
 		}
-		descriptors[call.Name] = args
 	}
 
-	return FluentDescription{
-		Name:        name,
-		Type:        typ,
-		Descriptors: descriptors,
-	}, nil
+	return description, nil
 }
