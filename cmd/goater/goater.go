@@ -80,7 +80,7 @@ func (gh *Goatherd) isGoatRun(node *ast.CallExpr) bool {
 		gh.isCallTo(node, "github.com/tmr232/goat", "Run")
 }
 func (gh *Goatherd) isGoatCommand(node *ast.CallExpr) bool {
-	if len(node.Args) != 2 {
+	if len(node.Args) != 1 {
 		return false
 	}
 	return gh.isCallTo(node, "github.com/tmr232/goat", "Command")
@@ -163,7 +163,7 @@ func findActionCalls(gh *Goatherd) []ast.Expr {
 			callArgs = append(callArgs, call.Args[0])
 		}
 		for _, call := range findNodesIf[*ast.CallExpr](syntax, gh.isGoatCommand) {
-			callArgs = append(callArgs, call.Args[1])
+			callArgs = append(callArgs, call.Args[0])
 		}
 	}
 	return callArgs
