@@ -77,7 +77,7 @@ func isFlagDescription(chain FluentChain) bool {
 	return true
 }
 
-func parseFlagDescription(fset *token.FileSet, chain FluentChain, getType func(expr ast.Expr) (string, error)) (FlagDescription, error) {
+func parseFlagDescription(fset *token.FileSet, chain FluentChain, getType func(expr ast.Expr) (string, error), reportError func(ast.Node, string)) (FlagDescription, error) {
 	id, err := formatNode(fset, chain.Calls[0].Args[0])
 	if err != nil {
 		return FlagDescription{}, errors.Wrap(err, "Could not format id node")
@@ -93,33 +93,51 @@ func parseFlagDescription(fset *token.FileSet, chain FluentChain, getType func(e
 		switch call.Name {
 		case "Name":
 			if description.Name != nil {
-				return FlagDescription{}, errors.New("Duplicate name directive found at " + fset.Position(call.Ident.Pos()).String())
+				reportError(call.Ident, "duplicate directive: .Name(name)")
+				return FlagDescription{}, errors.New("Duplicate Name directive found")
+			}
+			if len(call.Args) != 1 {
+				reportError(call.Ident, "Too many arguments passed to .Name(name)")
 			}
 			name, err := formatNode(fset, call.Args[0])
 			if err != nil {
+				reportError(call.Args[0], "Failed handling argument to .Name(name)")
 				return FlagDescription{}, errors.Wrap(err, "Failed formatting argument")
 			}
 			description.Name = &name
 
 		case "Usage":
 			if description.Usage != nil {
-				return FlagDescription{}, errors.New("Duplicate usage directive found")
+				reportError(call.Ident, "duplicate directive: .Usage(usage)")
+				return FlagDescription{}, errors.New("Duplicate Usage directive found")
 			}
-			name, err := formatNode(fset, call.Args[0])
+			if len(call.Args) != 1 {
+				reportError(call.Ident, "Too many arguments passed to .Usage(usage)")
+			}
+			usage, err := formatNode(fset, call.Args[0])
 			if err != nil {
+				reportError(call.Args[0], "Failed handling argument to .Usage(usage)")
 				return FlagDescription{}, errors.Wrap(err, "Failed formatting argument")
 			}
-			description.Usage = &name
+			description.Usage = &usage
 
 		case "Default":
 			if description.Default != nil {
-				return FlagDescription{}, errors.New("Duplicate default directive found")
+				reportError(call.Ident, "duplicate directive: .Default(default_)")
+				return FlagDescription{}, errors.New("Duplicate Default directive found")
 			}
-			name, err := formatNode(fset, call.Args[0])
+			if len(call.Args) != 1 {
+				reportError(call.Ident, "Too many arguments passed to .Default(default_)")
+			}
+			default_, err := formatNode(fset, call.Args[0])
 			if err != nil {
+				reportError(call.Args[0], "Failed handling argument to .Default(default_)")
 				return FlagDescription{}, errors.Wrap(err, "Failed formatting argument")
 			}
-			description.Default = &name
+			description.Default = &default_
+		default:
+			reportError(call.Ident, "Unrecognized directive: "+call.Name)
+			return FlagDescription{}, errors.New("unrecognized directive")
 		}
 	}
 

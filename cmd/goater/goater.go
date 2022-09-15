@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 	"github.com/pkg/errors"
 	"go/ast"
 	"go/format"
@@ -198,9 +199,11 @@ func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FlagDescription
 			return "", errors.New("Failed to find type of expression.")
 		}
 		return argType.String(), nil
-	})
+	},
+		func(node ast.Node, message string) {
+			fmt.Println(gh.pkg.Fset.Position(node.Pos()), "Error:", message)
+		})
 	if err != nil {
-		log.Println(err)
 		return FlagDescription{}, err
 	}
 	return description, nil
