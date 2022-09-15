@@ -77,7 +77,7 @@ func isFlagDescription(chain FluentChain) bool {
 	return true
 }
 
-func parseFlagDesciption(fset *token.FileSet, chain FluentChain, getType func(expr ast.Expr) (string, error)) (FlagDescription, error) {
+func parseFlagDescription(fset *token.FileSet, chain FluentChain, getType func(expr ast.Expr) (string, error)) (FlagDescription, error) {
 	id, err := formatNode(fset, chain.Calls[0].Args[0])
 	if err != nil {
 		return FlagDescription{}, errors.Wrap(err, "Could not format id node")

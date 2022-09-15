@@ -192,7 +192,7 @@ func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FlagDescription
 	if !isFlagDescription(chain) {
 		return FlagDescription{}, notAFlagDescription
 	}
-	description, err := parseFlagDesciption(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
+	description, err := parseFlagDescription(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
 		argType := gh.pkg.TypesInfo.TypeOf(expr)
 		if argType == nil {
 			return "", errors.New("Failed to find type of expression.")
