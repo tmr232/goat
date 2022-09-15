@@ -185,10 +185,12 @@ func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature) {
 	return
 }
 
-func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FlagDescription, bool) {
+var notAFlagDescription = errors.New("Not a flag description")
+
+func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FlagDescription, error) {
 	chain := parseFluentChain(callExpr)
 	if !isFlagDescription(chain) {
-		return FlagDescription{}, false
+		return FlagDescription{}, notAFlagDescription
 	}
 	description, err := parseFlagDesciption(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
 		argType := gh.pkg.TypesInfo.TypeOf(expr)
@@ -199,13 +201,15 @@ func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FlagDescription
 	})
 	if err != nil {
 		log.Println(err)
-		return FlagDescription{}, false
+		return FlagDescription{}, err
 	}
-	return description, true
+	return description, nil
 }
 
-func (gh *Goatherd) parseDescriptions(f *types.Func) []FlagDescription {
+func (gh *Goatherd) parseDescriptions(f *types.Func) ([]FlagDescription, error) {
 	fdecl := gh.findFuncDecl(f)
+
+	var parseErrors []error
 
 	var descriptions []FlagDescription
 	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
@@ -214,10 +218,13 @@ func (gh *Goatherd) parseDescriptions(f *types.Func) []FlagDescription {
 			// Keep going!
 			return true
 		}
-		description, isOk := gh.parseArgDescription(callExpr)
-		if !isOk {
+		description, err := gh.parseArgDescription(callExpr)
+		if err == notAFlagDescription {
 			// Keep going
 			return true
+		}
+		if err != nil {
+			parseErrors = append(parseErrors, err)
 		}
 		descriptions = append(descriptions, description)
 
@@ -225,7 +232,10 @@ func (gh *Goatherd) parseDescriptions(f *types.Func) []FlagDescription {
 		return false
 	})
 
-	return descriptions
+	if len(parseErrors) != 0 {
+		return nil, errors.New("Encountered errors!")
+	}
+	return descriptions, nil
 
 }
 
@@ -322,7 +332,10 @@ func main() {
 	var actions []Action
 	for _, actionFunc := range gh.findActionFunctions() {
 		signature := gh.parseSignature(actionFunc)
-		descriptions := gh.parseDescriptions(actionFunc)
+		descriptions, err := gh.parseDescriptions(actionFunc)
+		if err != nil {
+			log.Fatal(err)
+		}
 		actions = append(actions, makeAction(signature, descriptions))
 	}
 	data := struct {
