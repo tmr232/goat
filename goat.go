@@ -1,7 +1,7 @@
 package goat
 
 import (
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"log"
 	"os"
 	"reflect"
@@ -40,10 +40,10 @@ func Run(f any) {
 	}
 }
 
-func Command(name string, f any) cli.Command {
+func Command(name string, f any) *cli.Command {
 	config := registry[reflect.ValueOf(f)]
 
-	return cli.Command{
+	return &cli.Command{
 		Flags:  config.Flags,
 		Action: config.Action,
 		Name:   name,
@@ -61,7 +61,7 @@ func (app Application) Run() {
 		log.Fatal(err)
 	}
 }
-func App(name string, commands ...cli.Command) Application {
+func App(name string, commands ...*cli.Command) Application {
 	return Application{
 		App: &cli.App{
 			Name:     name,
