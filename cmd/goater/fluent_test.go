@@ -29,7 +29,7 @@ func Test_parseFluentDescription(t *testing.T) {
 		t.Error(err)
 	}
 	chain := parseFluentChain(expr.(*ast.CallExpr))
-	description, err := parseFluentDescription(fset, chain, func(node ast.Node) (string, error) { return "type", nil })
+	description, err := parseFluentDescription(fset, chain, func(node ast.Expr) (string, error) { return "type", nil })
 	if err != nil {
 		t.Error(err)
 	}
