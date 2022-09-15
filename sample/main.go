@@ -38,6 +38,8 @@ func app(name string, goodbye bool, question *string, times int) error {
 }
 
 func hello() error {
+	goat.Self().
+		Usage("Say hello to the world.")
 	fmt.Println("Hello, World!")
 	return nil
 }
