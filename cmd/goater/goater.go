@@ -187,6 +187,9 @@ func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature) {
 
 func (gh *Goatherd) parseArgDescription(callExpr *ast.CallExpr) (FlagDescription, bool) {
 	chain := parseFluentChain(callExpr)
+	if !isFlagDescription(chain) {
+		return FlagDescription{}, false
+	}
 	description, err := parseFlagDesciption(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
 		argType := gh.pkg.TypesInfo.TypeOf(expr)
 		if argType == nil {
