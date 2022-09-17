@@ -5,12 +5,14 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/tmr232/goat"
 	"go/ast"
 	"go/format"
 	"go/types"
 	"golang.org/x/tools/go/packages"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 	"text/template"
 )
@@ -222,8 +224,8 @@ func (gh *Goatherd) parseActionDescription(f *types.Func) (ActionDescription, er
 			// Keep going!
 			return true
 		}
-		chain := parseFluentChain(callExpr)
-		if !isActionDescription(chain) {
+		chain, isChain := parseFluentChain(callExpr)
+		if !isChain || !isActionDescription(chain) {
 			// Keep going
 			return true
 		}
@@ -272,8 +274,8 @@ func (gh *Goatherd) parseFlagDescriptions(f *types.Func) ([]FlagDescription, err
 
 }
 func (gh *Goatherd) parseFlagDescription(callExpr *ast.CallExpr) (FlagDescription, error) {
-	chain := parseFluentChain(callExpr)
-	if !isFlagDescription(chain) {
+	chain, isChain := parseFluentChain(callExpr)
+	if !isChain || !isFlagDescription(chain) {
 		return FlagDescription{}, notAFlagDescription
 	}
 	description, err := parseFlagDescription(gh.pkg.Fset, chain, func(expr ast.Expr) (string, error) {
@@ -326,10 +328,11 @@ func formatSource(src string) string {
 }
 
 type Flag struct {
-	Type    string
-	Name    string
-	Usage   string
-	Default string
+	Type      string
+	Name      string
+	Usage     string
+	Default   string
+	IsContext bool
 }
 type Action struct {
 	Function string
@@ -339,18 +342,29 @@ type Action struct {
 	NoError  bool
 }
 
+func isGoatContext(typeName string) bool {
+	goatContextType := reflect.TypeOf(*new(goat.Context))
+	goatContextTypeName := "*" + goatContextType.PkgPath() + "." + goatContextType.Name()
+	return typeName == goatContextTypeName
+}
+
 func makeAction(signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
 	flagByArgName := make(map[string]Flag)
 	for _, arg := range signature.Args {
 		flagByArgName[arg.Name] = Flag{
-			Type:    arg.Type,
-			Name:    "\"" + arg.Name + "\"",
-			Default: "nil",
-			Usage:   "\"\"",
+			Type:      arg.Type,
+			Name:      "\"" + arg.Name + "\"",
+			Default:   "nil",
+			Usage:     "\"\"",
+			IsContext: isGoatContext(arg.Type),
 		}
 	}
 	for _, desc := range flagDescriptions {
 		typ := desc.Type
+		if isGoatContext(typ) {
+			// goat.Context is not a flag type, it's always the context object.
+			continue
+		}
 		name := "\"" + desc.Id + "\""
 		if desc.Name != nil {
 			name = *desc.Name
@@ -364,10 +378,11 @@ func makeAction(signature GoatSignature, actionDescription ActionDescription, fl
 			default_ = *desc.Default
 		}
 		flagByArgName[desc.Id] = Flag{
-			Type:    typ,
-			Name:    name,
-			Usage:   usage,
-			Default: default_,
+			Type:      typ,
+			Name:      name,
+			Usage:     usage,
+			Default:   default_,
+			IsContext: false,
 		}
 	}
 	var flags []Flag

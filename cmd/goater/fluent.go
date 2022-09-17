@@ -28,11 +28,17 @@ func formatNode(fset *token.FileSet, node ast.Node) (string, error) {
 	return buf.String(), nil
 }
 
-func parseFluentChain(call *ast.CallExpr) FluentChain {
+func parseFluentChain(call *ast.CallExpr) (FluentChain, bool) {
 	var calls []FluentCall
 	var selector *ast.SelectorExpr
+	var ok bool
 	for {
-		selector, _ = call.Fun.(*ast.SelectorExpr)
+		selector, ok = call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			// If we can't handle the chain - we just assume it's not a fluent chain, and return an empty one.
+			// TODO: Handle generics. Generics use ast.IndexExpr and are therefore not supported here.
+			return FluentChain{}, false
+		}
 		args := call.Args
 		name := selector.Sel.Name
 		calls = append(calls, FluentCall{
@@ -51,7 +57,7 @@ func parseFluentChain(call *ast.CallExpr) FluentChain {
 	return FluentChain{
 		Base:  base,
 		Calls: Reversed(calls),
-	}
+	}, true
 
 }
 
