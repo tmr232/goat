@@ -174,21 +174,37 @@ type GoatArg struct {
 	Type string
 }
 type GoatSignature struct {
-	Name string
-	Args []GoatArg
+	Name    string
+	Args    []GoatArg
+	NoError bool
 }
 
-func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature) {
+func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature, err error) {
 	signature.Name = f.Name()
 
 	funcSignature := f.Type().(*types.Signature)
+
+	results := funcSignature.Results()
+	switch results.Len() {
+	case 0:
+		signature.NoError = true
+	case 1:
+		signature.NoError = false
+		result := results.At(0)
+		if result.Type().String() != "error" {
+			return GoatSignature{}, errors.New("Action function result must be either error or nothing")
+		}
+	default:
+		return GoatSignature{}, errors.New("Action function returns more than 1 value")
+	}
+
 	for i := 0; i < funcSignature.Params().Len(); i++ {
 		param := funcSignature.Params().At(i)
 		paramName := param.Name()
 		paramType := param.Type().String()
 		signature.Args = append(signature.Args, GoatArg{Name: paramName, Type: paramType})
 	}
-	return
+	return signature, nil
 }
 
 var notAFlagDescription = errors.New("Not a flag description")
@@ -321,6 +337,7 @@ type Action struct {
 	Flags    []Flag
 	Name     string
 	Usage    string
+	NoError  bool
 }
 
 func makeAction(signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
@@ -374,6 +391,7 @@ func makeAction(signature GoatSignature, actionDescription ActionDescription, fl
 		Flags:    flags,
 		Name:     name,
 		Usage:    usage,
+		NoError:  signature.NoError,
 	}
 }
 
@@ -381,7 +399,10 @@ func main() {
 	gh := NewGoatherd(loadPackages())
 	var actions []Action
 	for _, actionFunc := range gh.findActionFunctions() {
-		signature := gh.parseSignature(actionFunc)
+		signature, err := gh.parseSignature(actionFunc)
+		if err != nil {
+			log.Fatal(err)
+		}
 		actionDescription, err := gh.parseActionDescription(actionFunc)
 		if err != nil {
 			log.Fatal(err)
