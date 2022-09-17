@@ -47,14 +47,15 @@ func Run(f any) {
 	}
 }
 
-func Command(f any) *cli.Command {
+func Command(f any, subcommands ...*cli.Command) *cli.Command {
 	config := registry[reflect.ValueOf(f)]
 
 	return &cli.Command{
-		Flags:  config.Flags,
-		Action: config.Action,
-		Name:   config.Name,
-		Usage:  config.Usage,
+		Flags:       config.Flags,
+		Action:      config.Action,
+		Name:        config.Name,
+		Usage:       config.Usage,
+		Subcommands: subcommands,
 	}
 }
 
