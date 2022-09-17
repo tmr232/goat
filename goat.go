@@ -12,23 +12,28 @@ type RunConfig struct {
 	// TODO: Replace this with a function that takes the action function and returns ActionFunc
 	//		 This is needed for supporting function literals instead of named functions.
 	//		 This is also required for anything beyond named functions.
-	Action cli.ActionFunc
-	Name   string
-	Usage  string
+	Action         cli.ActionFunc
+	CtxFlagBuilder func(c *cli.Context) map[string]any
+	Name           string
+	Usage          string
 }
 
-var registry map[reflect.Value]RunConfig
+var runConfigByFunction map[reflect.Value]RunConfig
+var functionByCliActionFunc map[reflect.Value]reflect.Value
 
 func init() {
-	registry = make(map[reflect.Value]RunConfig)
+	runConfigByFunction = make(map[reflect.Value]RunConfig)
+	functionByCliActionFunc = make(map[reflect.Value]reflect.Value)
 }
 
 func Register(app any, config RunConfig) {
-	registry[reflect.ValueOf(app)] = config
+	appValue := reflect.ValueOf(app)
+	runConfigByFunction[appValue] = config
+	functionByCliActionFunc[reflect.ValueOf(config.Action)] = appValue
 }
 
 func RunE(f any) error {
-	config := registry[reflect.ValueOf(f)]
+	config := runConfigByFunction[reflect.ValueOf(f)]
 
 	app := &cli.App{
 		Flags:  config.Flags,
@@ -48,7 +53,7 @@ func Run(f any) {
 }
 
 func Command(f any, subcommands ...*cli.Command) *cli.Command {
-	config := registry[reflect.ValueOf(f)]
+	config := runConfigByFunction[reflect.ValueOf(f)]
 
 	return &cli.Command{
 		Flags:       config.Flags,

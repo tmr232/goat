@@ -23,26 +23,41 @@
     goat.Register({{.Function}}, goat.RunConfig{
     Flags: []cli.Flag{
     {{- range .Flags}}
-        flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}).AsCliFlag(),
+        {{- if not .IsContext}}
+            flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}).AsCliFlag(),
+        {{- end}}
     {{- end}}
     },
     Name: {{.Name}},
     Usage: {{.Usage}},
     Action: func(c *cli.Context) error {
     {{- if .NoError }}
-        {{.Function}}(
-        {{- range .Flags}}
-            flags.GetFlag[{{.Type}}](c, {{.Name}}),
-        {{- end}}
-        )
+        {{- template "function-call" . }}
         return nil
     {{- else}}
-        return {{.Function}}(
-        {{- range .Flags}}
-            flags.GetFlag[{{.Type}}](c, {{.Name}}),
-        {{- end}}
-        )
+        return {{- template "function-call" . -}}
     {{- end}}
+    },
+    CtxFlagBuilder: func(c *cli.Context) map[string]any {
+    cflags := make(map[string]any)
+    {{- range .Flags}}
+        {{- if not .IsContext}}
+            cflags[{{.Name}}] = flags.GetFlag[{{.Type}}](c, {{.Name}})
+        {{- end}}
+    {{- end}}
+    return cflags
     },
     })
 {{end}}
+
+{{- define "function-call"}}
+    {{.Function}}(
+    {{- range .Flags}}
+        {{ if .IsContext }}
+            goat.GetContext(c),
+        {{else}}
+            flags.GetFlag[{{.Type}}](c, {{.Name}}),
+        {{end}}
+    {{- end}}
+    )
+{{- end}}
