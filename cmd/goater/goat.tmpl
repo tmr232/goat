@@ -29,11 +29,20 @@
     Name: {{.Name}},
     Usage: {{.Usage}},
     Action: func(c *cli.Context) error {
-    return {{.Function}}(
-    {{- range .Flags}}
-        flags.GetFlag[{{.Type}}](c, {{.Name}}),
+    {{- if .NoError }}
+        {{.Function}}(
+        {{- range .Flags}}
+            flags.GetFlag[{{.Type}}](c, {{.Name}}),
+        {{- end}}
+        )
+        return nil
+    {{- else}}
+        return {{.Function}}(
+        {{- range .Flags}}
+            flags.GetFlag[{{.Type}}](c, {{.Name}}),
+        {{- end}}
+        )
     {{- end}}
-    )
     },
     })
 {{end}}
