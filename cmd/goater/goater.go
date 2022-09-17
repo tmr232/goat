@@ -11,7 +11,6 @@ import (
 	"golang.org/x/tools/go/packages"
 	"log"
 	"os"
-	"reflect"
 	"strings"
 	"text/template"
 )
@@ -80,7 +79,7 @@ func (gh *Goatherd) isGoatRun(node *ast.CallExpr) bool {
 		gh.isCallTo(node, "github.com/tmr232/goat", "Run")
 }
 func (gh *Goatherd) isGoatCommand(node *ast.CallExpr) bool {
-	if len(node.Args) != 1 {
+	if len(node.Args) < 1 {
 		return false
 	}
 	return gh.isCallTo(node, "github.com/tmr232/goat", "Command")
@@ -120,10 +119,10 @@ func (gh *Goatherd) findActionFunctions() (actionFunctions []*types.Func) {
 	for _, arg := range callArgs {
 		ident, isIdent := arg.(*ast.Ident)
 		if !isIdent {
-			funcLit := arg.(*ast.FuncLit)
-			fmt.Println(gh.pkg.TypesInfo.TypeOf(funcLit))
-			fmt.Println(reflect.TypeOf(gh.pkg.TypesInfo.TypeOf(funcLit)))
-			fmt.Println(gh.pkg.TypesInfo.TypeOf(funcLit).(*types.Signature))
+			//funcLit := arg.(*ast.FuncLit)
+			//fmt.Println(gh.pkg.TypesInfo.TypeOf(funcLit))
+			//fmt.Println(reflect.TypeOf(gh.pkg.TypesInfo.TypeOf(funcLit)))
+			//fmt.Println(gh.pkg.TypesInfo.TypeOf(funcLit).(*types.Signature))
 			log.Fatalf("%s goat.Run only accepts free functions.", gh.pkg.Fset.Position(arg.Pos()))
 		}
 		definition, exists := gh.pkg.TypesInfo.Uses[ident]
@@ -146,8 +145,8 @@ func findNodesIf[T ast.Node](file *ast.File, pred func(node T) bool) []T {
 			if typedNode, isRightType := node.(T); isRightType {
 				if pred(typedNode) {
 					matchingNodes = append(matchingNodes, typedNode)
-					// We only stop recursion if we match the predicate
-					return false
+					// We recurse the entire AST without stopping as there may be
+					// nested calls when we create subcommands.
 				}
 			}
 			return true
