@@ -29,17 +29,27 @@ func tryCast[T any](from any) T {
 	return from.(T)
 }
 
+// TypeHandler defines the handling of a specific Flag type.
+//
+// MakeFlag creates a flag based on its description.
+// GetFlag gets the value of a flag.
 type TypeHandler interface {
 	MakeFlag(name, usage string, defaultValue any) Flag
 	GetFlag(c *cli.Context, name string) any
 }
 
+// flagHandlers is the registry of type handlers for flags.
 var flagHandlers map[reflect.Type]TypeHandler
 
 func init() {
 	flagHandlers = make(map[reflect.Type]TypeHandler)
 }
 
+// RegisterTypeHandler registers a flag-handler for a specific type.
+//
+// There can only be a single handler for every time.
+//
+// A type and a pointer to the same type are different types.
 func RegisterTypeHandler[T any](handler TypeHandler) {
 	handledType := reflect.TypeOf(*new(T))
 	_, exists := flagHandlers[handledType]
@@ -63,6 +73,7 @@ func (impl *typeHandlerImpl) GetFlag(c *cli.Context, name string) any {
 }
 
 func init() {
+	// Register all the default types.
 	RegisterTypeHandler[int](&typeHandlerImpl{
 		makeFlag: func(name, usage string, defaultValue any) Flag {
 			if defaultValue == nil {
@@ -150,6 +161,7 @@ func MakeFlag[T any](name string, usage string, defaultValue any) Flag {
 	return handler.MakeFlag(name, usage, defaultValue)
 }
 
+// GetFlag gets the value of a flag by its name.
 func GetFlag[T any](c *cli.Context, name string) T {
 	handler, exists := flagHandlers[reflect.TypeOf(*new(T))]
 	if !exists {
