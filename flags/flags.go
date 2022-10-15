@@ -1,16 +1,10 @@
 package flags
 
 import (
-	cli "github.com/urfave/cli/v2"
+	"github.com/tmr232/goat/flags/internal/flags"
+	"github.com/urfave/cli/v2"
 	"reflect"
 )
-
-func tryDeref[T any](ptr *T) T {
-	if ptr == nil {
-		return *new(T)
-	}
-	return *ptr
-}
 
 type Flag interface {
 	AsCliFlag() cli.Flag
@@ -26,100 +20,6 @@ func (f *SimpleFlag) AsCliFlag() cli.Flag {
 
 func AsSimpleFlag(flag cli.Flag) Flag {
 	return &SimpleFlag{flag}
-}
-
-type DefaultIntFlag struct {
-	Name    string
-	Usage   string
-	Default int
-}
-
-func (flag DefaultIntFlag) AsCliFlag() cli.Flag {
-	return &cli.IntFlag{
-		Name:  flag.Name,
-		Usage: flag.Usage,
-		Value: flag.Default,
-	}
-}
-
-type RequiredIntFlag struct {
-	Name  string
-	Usage string
-}
-
-func (flag RequiredIntFlag) AsCliFlag() cli.Flag {
-	return &cli.IntFlag{
-		Name:     flag.Name,
-		Usage:    flag.Usage,
-		Required: true,
-	}
-}
-
-type OptionalIntFlag struct {
-	Name  string
-	Usage string
-}
-
-func (flag OptionalIntFlag) AsCliFlag() cli.Flag {
-	return &cli.IntFlag{
-		Name:     flag.Name,
-		Usage:    flag.Usage,
-		Required: false,
-	}
-}
-
-type DefaultStringFlag struct {
-	Name    string
-	Usage   string
-	Default string
-}
-
-func (flag DefaultStringFlag) AsCliFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  flag.Name,
-		Usage: flag.Usage,
-		Value: flag.Default,
-	}
-}
-
-type RequiredStringFlag struct {
-	Name  string
-	Usage string
-}
-
-func (flag RequiredStringFlag) AsCliFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:     flag.Name,
-		Usage:    flag.Usage,
-		Required: true,
-	}
-}
-
-type OptionalStringFlag struct {
-	Name  string
-	Usage string
-}
-
-func (flag OptionalStringFlag) AsCliFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:     flag.Name,
-		Usage:    flag.Usage,
-		Required: false,
-	}
-}
-
-type BoolFlag struct {
-	Name    string
-	Usage   string
-	Default bool
-}
-
-func (flag BoolFlag) AsCliFlag() cli.Flag {
-	return &cli.BoolFlag{
-		Name:  flag.Name,
-		Usage: flag.Usage,
-		Value: flag.Default,
-	}
 }
 
 func tryCast[T any](from any) T {
@@ -166,9 +66,9 @@ func init() {
 	RegisterTypeHandler[int](&typeHandlerImpl{
 		makeFlag: func(name, usage string, defaultValue any) Flag {
 			if defaultValue == nil {
-				return RequiredIntFlag{Name: name, Usage: usage}
+				return flags.RequiredIntFlag{Name: name, Usage: usage}
 			}
-			return DefaultIntFlag{
+			return flags.DefaultIntFlag{
 				Name:    name,
 				Usage:   usage,
 				Default: tryCast[int](defaultValue),
@@ -181,7 +81,7 @@ func init() {
 
 	RegisterTypeHandler[*int](&typeHandlerImpl{
 		makeFlag: func(name, usage string, defaultValue any) Flag {
-			return OptionalIntFlag{
+			return flags.OptionalIntFlag{
 				Name:  name,
 				Usage: usage,
 			}
@@ -197,12 +97,12 @@ func init() {
 	RegisterTypeHandler[string](&typeHandlerImpl{
 		makeFlag: func(name, usage string, defaultValue any) Flag {
 			if defaultValue == nil {
-				return RequiredStringFlag{
+				return flags.RequiredStringFlag{
 					Name:  name,
 					Usage: usage,
 				}
 			}
-			return DefaultStringFlag{
+			return flags.DefaultStringFlag{
 				Name:    name,
 				Usage:   usage,
 				Default: tryCast[string](defaultValue),
@@ -214,7 +114,7 @@ func init() {
 	})
 	RegisterTypeHandler[*string](&typeHandlerImpl{
 		makeFlag: func(name, usage string, defaultValue any) Flag {
-			return OptionalStringFlag{
+			return flags.OptionalStringFlag{
 				Name:  name,
 				Usage: usage,
 			}
@@ -229,7 +129,7 @@ func init() {
 	})
 	RegisterTypeHandler[bool](&typeHandlerImpl{
 		makeFlag: func(name, usage string, defaultValue any) Flag {
-			return BoolFlag{
+			return flags.BoolFlag{
 				Name:    name,
 				Usage:   usage,
 				Default: tryCast[bool](defaultValue),
