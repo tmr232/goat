@@ -16,6 +16,18 @@ type Flag interface {
 	AsCliFlag() cli.Flag
 }
 
+type SimpleFlag struct {
+	Flag cli.Flag
+}
+
+func (f *SimpleFlag) AsCliFlag() cli.Flag {
+	return f.Flag
+}
+
+func AsSimpleFlag(flag cli.Flag) Flag {
+	return &SimpleFlag{flag}
+}
+
 type DefaultIntFlag struct {
 	Name    string
 	Usage   string
@@ -117,102 +129,133 @@ func tryCast[T any](from any) T {
 	return from.(T)
 }
 
-type FlagCtor func(name, usage string, defaultValue any) Flag
-
-var customTypes map[reflect.Type]FlagCtor
-
-func init() {
-	customTypes = make(map[reflect.Type]FlagCtor)
+type TypeHandler interface {
+	MakeFlag(name, usage string, defaultValue any) Flag
+	GetFlag(c *cli.Context, name string) any
 }
 
-func registerType[T any](ctor FlagCtor) {
-	customTypes[reflect.TypeOf(*new(T))] = ctor
+var flagHandlers map[reflect.Type]TypeHandler
+
+func init() {
+	flagHandlers = make(map[reflect.Type]TypeHandler)
+}
+
+func RegisterTypeHandler[T any](handler TypeHandler) {
+	handledType := reflect.TypeOf(*new(T))
+	_, exists := flagHandlers[handledType]
+	if exists {
+		panic("Type handler for type " + handledType.Name() + " already exists.")
+	}
+	flagHandlers[handledType] = handler
+}
+
+type typeHandlerImpl struct {
+	makeFlag func(name, usage string, defaultValue any) Flag
+	getFlag  func(c *cli.Context, name string) any
+}
+
+func (impl *typeHandlerImpl) MakeFlag(name, usage string, defaultValue any) Flag {
+	return impl.makeFlag(name, usage, defaultValue)
+}
+
+func (impl *typeHandlerImpl) GetFlag(c *cli.Context, name string) any {
+	return impl.getFlag(c, name)
 }
 
 func init() {
-	registerType[int](func(name, usage string, defaultValue any) Flag {
-		if defaultValue == nil {
-			return RequiredIntFlag{Name: name, Usage: usage}
-		}
-		return DefaultIntFlag{
-			Name:    name,
-			Usage:   usage,
-			Default: tryCast[int](defaultValue),
-		}
+	RegisterTypeHandler[int](&typeHandlerImpl{
+		makeFlag: func(name, usage string, defaultValue any) Flag {
+			if defaultValue == nil {
+				return RequiredIntFlag{Name: name, Usage: usage}
+			}
+			return DefaultIntFlag{
+				Name:    name,
+				Usage:   usage,
+				Default: tryCast[int](defaultValue),
+			}
+		},
+		getFlag: func(c *cli.Context, name string) any {
+			return c.Int(name)
+		},
 	})
 
-	registerType[*int](func(name, usage string, defaultValue any) Flag {
-		return OptionalIntFlag{
-			Name:  name,
-			Usage: usage,
-		}
-	})
-
-	registerType[string](func(name, usage string, defaultValue any) Flag {
-		if defaultValue == nil {
-			return RequiredStringFlag{
+	RegisterTypeHandler[*int](&typeHandlerImpl{
+		makeFlag: func(name, usage string, defaultValue any) Flag {
+			return OptionalIntFlag{
 				Name:  name,
 				Usage: usage,
 			}
-		}
-		return DefaultStringFlag{
-			Name:    name,
-			Usage:   usage,
-			Default: tryCast[string](defaultValue),
-		}
+		},
+		getFlag: func(c *cli.Context, name string) any {
+			if c.IsSet(name) {
+				i := c.Int(name)
+				return &i
+			}
+			return nil
+		},
 	})
-
-	registerType[*string](func(name, usage string, defaultValue any) Flag {
-		return OptionalStringFlag{
-			Name:  name,
-			Usage: usage,
-		}
+	RegisterTypeHandler[string](&typeHandlerImpl{
+		makeFlag: func(name, usage string, defaultValue any) Flag {
+			if defaultValue == nil {
+				return RequiredStringFlag{
+					Name:  name,
+					Usage: usage,
+				}
+			}
+			return DefaultStringFlag{
+				Name:    name,
+				Usage:   usage,
+				Default: tryCast[string](defaultValue),
+			}
+		},
+		getFlag: func(c *cli.Context, name string) any {
+			return c.String(name)
+		},
 	})
-
-	registerType[bool](func(name, usage string, defaultValue any) Flag {
-		return BoolFlag{
-			Name:    name,
-			Usage:   usage,
-			Default: tryCast[bool](defaultValue),
-		}
+	RegisterTypeHandler[*string](&typeHandlerImpl{
+		makeFlag: func(name, usage string, defaultValue any) Flag {
+			return OptionalStringFlag{
+				Name:  name,
+				Usage: usage,
+			}
+		},
+		getFlag: func(c *cli.Context, name string) any {
+			if c.IsSet(name) {
+				s := c.String(name)
+				return &s
+			}
+			return nil
+		},
+	})
+	RegisterTypeHandler[bool](&typeHandlerImpl{
+		makeFlag: func(name, usage string, defaultValue any) Flag {
+			return BoolFlag{
+				Name:    name,
+				Usage:   usage,
+				Default: tryCast[bool](defaultValue),
+			}
+		},
+		getFlag: func(c *cli.Context, name string) any {
+			return c.Bool(name)
+		},
 	})
 }
 
 // MakeFlag creates a flag from a type and description values.
 func MakeFlag[T any](name string, usage string, defaultValue any) Flag {
-	flagCtor, exists := customTypes[reflect.TypeOf(*new(T))]
+	handler, exists := flagHandlers[reflect.TypeOf(*new(T))]
 	if !exists {
 		panic("Missing handler for type")
 	}
-	return flagCtor(name, usage, defaultValue)
-}
-
-func cast[T any](from any) T {
-	return from.(T)
+	return handler.MakeFlag(name, usage, defaultValue)
 }
 
 func GetFlag[T any](c *cli.Context, name string) T {
-	switch any(*new(T)).(type) {
-	case int:
-		return cast[T](c.Int(name))
-	case *int:
-		if c.IsSet(name) {
-			i := c.Int(name)
-			return cast[T](&i)
-		}
-		return *new(T)
-	case string:
-		return cast[T](c.String(name))
-	case *string:
-		if c.IsSet(name) {
-			s := c.String(name)
-			return cast[T](&s)
-		}
-		return *new(T)
-	case bool:
-		return cast[T](c.Bool(name))
+	handler, exists := flagHandlers[reflect.TypeOf(*new(T))]
+	if !exists {
+		panic("oh no!")
 	}
-	panic("oh no!")
+	return handler.GetFlag(c, name).(T)
 }
 
 /*
