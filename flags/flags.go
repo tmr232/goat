@@ -2,6 +2,7 @@ package flags
 
 import (
 	cli "github.com/urfave/cli/v2"
+	"reflect"
 )
 
 func tryDeref[T any](ptr *T) T {
@@ -116,9 +117,20 @@ func tryCast[T any](from any) T {
 	return from.(T)
 }
 
-func MakeFlag[T any](name string, usage string, defaultValue any) Flag {
-	switch any(*new(T)).(type) {
-	case int:
+type FlagCtor func(name, usage string, defaultValue any) Flag
+
+var customTypes map[reflect.Type]FlagCtor
+
+func init() {
+	customTypes = make(map[reflect.Type]FlagCtor)
+}
+
+func registerType[T any](ctor FlagCtor) {
+	customTypes[reflect.TypeOf(*new(T))] = ctor
+}
+
+func init() {
+	registerType[int](func(name, usage string, defaultValue any) Flag {
 		if defaultValue == nil {
 			return RequiredIntFlag{Name: name, Usage: usage}
 		}
@@ -127,12 +139,16 @@ func MakeFlag[T any](name string, usage string, defaultValue any) Flag {
 			Usage:   usage,
 			Default: tryCast[int](defaultValue),
 		}
-	case *int:
+	})
+
+	registerType[*int](func(name, usage string, defaultValue any) Flag {
 		return OptionalIntFlag{
 			Name:  name,
 			Usage: usage,
 		}
-	case string:
+	})
+
+	registerType[string](func(name, usage string, defaultValue any) Flag {
 		if defaultValue == nil {
 			return RequiredStringFlag{
 				Name:  name,
@@ -144,21 +160,31 @@ func MakeFlag[T any](name string, usage string, defaultValue any) Flag {
 			Usage:   usage,
 			Default: tryCast[string](defaultValue),
 		}
-	case *string:
+	})
+
+	registerType[*string](func(name, usage string, defaultValue any) Flag {
 		return OptionalStringFlag{
 			Name:  name,
 			Usage: usage,
 		}
-	case bool:
+	})
+
+	registerType[bool](func(name, usage string, defaultValue any) Flag {
 		return BoolFlag{
 			Name:    name,
 			Usage:   usage,
 			Default: tryCast[bool](defaultValue),
 		}
-	default:
+	})
+}
+
+// MakeFlag creates a flag from a type and description values.
+func MakeFlag[T any](name string, usage string, defaultValue any) Flag {
+	flagCtor, exists := customTypes[reflect.TypeOf(*new(T))]
+	if !exists {
 		panic("Missing handler for type")
 	}
-
+	return flagCtor(name, usage, defaultValue)
 }
 
 func cast[T any](from any) T {
