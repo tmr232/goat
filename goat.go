@@ -57,16 +57,56 @@ func Run(f any) {
 	}
 }
 
-func Command(f any, subcommands ...*cli.Command) *cli.Command {
+type AppPart interface {
+	cliCommand() *cli.Command
+}
+
+type GoatCommand struct {
+	command *cli.Command
+}
+
+func (g *GoatCommand) cliCommand() *cli.Command {
+	return g.command
+}
+
+type GoatGroup struct {
+	command *cli.Command
+}
+
+func (g *GoatGroup) cliCommand() *cli.Command {
+	return g.command
+}
+
+func (g *GoatGroup) Usage(usage string) *GoatGroup {
+	g.command.Usage = usage
+	return g
+}
+
+func PartsToCommands(parts []AppPart) []*cli.Command {
+	commands := make([]*cli.Command, len(parts))
+	for i, part := range parts {
+		commands[i] = part.cliCommand()
+	}
+	return commands
+}
+
+func Command(f any, subcommands ...AppPart) *GoatCommand {
 	config := runConfigByFunction[reflect.ValueOf(f)]
 
-	return &cli.Command{
+	return &GoatCommand{&cli.Command{
 		Flags:       config.Flags,
 		Action:      config.Action,
 		Name:        config.Name,
 		Usage:       config.Usage,
-		Subcommands: subcommands,
-	}
+		Subcommands: PartsToCommands(subcommands),
+	}}
+}
+
+func Group(name string, subcommands ...AppPart) *GoatGroup {
+	return &GoatGroup{&cli.Command{
+		Name:        name,
+		Subcommands: PartsToCommands(subcommands),
+	}}
 }
 
 type Application struct{ *cli.App }
@@ -80,11 +120,11 @@ func (app Application) Run() {
 		log.Fatal(err)
 	}
 }
-func App(name string, commands ...*cli.Command) Application {
+func App(name string, commands ...AppPart) Application {
 	return Application{
 		App: &cli.App{
 			Name:     name,
-			Commands: commands,
+			Commands: PartsToCommands(commands),
 		},
 	}
 }
