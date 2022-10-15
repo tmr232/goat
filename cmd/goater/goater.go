@@ -87,7 +87,12 @@ func (gh *Goatherd) isGoatCommand(node *ast.CallExpr) bool {
 	return gh.isCallTo(node, "github.com/tmr232/goat", "Command")
 }
 
-func (gh *Goatherd) isCallTo(node ast.Node, pkgPath, name string) bool {
+type callTarget struct {
+	PkgPath string
+	Name    string
+}
+
+func isCallTo(target callTarget, node ast.Node, typesInfo *types.Info) bool {
 	callExpr, isCall := node.(*ast.CallExpr)
 	if !isCall {
 		return false
@@ -95,21 +100,38 @@ func (gh *Goatherd) isCallTo(node ast.Node, pkgPath, name string) bool {
 
 	found := false
 	ast.Inspect(callExpr.Fun, func(node ast.Node) bool {
-		if ident, isIdent := node.(*ast.Ident); isIdent {
-			uses, exists := gh.pkg.TypesInfo.Uses[ident]
-			if !exists {
-				return false
-			}
-			if uses.Pkg() == nil {
-				return false
-			}
-			if uses.Pkg().Path() == pkgPath && uses.Name() == name {
-				found = true
-			}
+		if found {
+			return false
+		}
+
+		ident, isIdent := node.(*ast.Ident)
+		if !isIdent {
+			return !found
+		}
+
+		definition, exists := typesInfo.Uses[ident]
+		if !exists {
+			return false
+		}
+
+		funcDef, isFunc := definition.(*types.Func)
+		if !isFunc {
+			return false
+		}
+
+		if funcDef.Pkg() == nil {
+			return false
+		}
+		if funcDef.Pkg().Path() == target.PkgPath && funcDef.Name() == target.Name {
+			found = true
 		}
 		return !found
 	})
 	return found
+}
+
+func (gh *Goatherd) isCallTo(node ast.Node, pkgPath, name string) bool {
+	return isCallTo(callTarget{Name: name, PkgPath: pkgPath}, node, gh.pkg.TypesInfo)
 }
 
 func (gh *Goatherd) findActionFunctions() (actionFunctions []*types.Func) {
