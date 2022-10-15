@@ -37,12 +37,11 @@ func main() {
 
 ```
 
-## Status
+## Status & Contibuting
 
-This is still in experimental state, API is unstable and may break.
+Slowly moving forward, but not yet stable.
 
-Additionally, the code is an undocumented mess. Be warned.
-
+Experimentation, bug reports, and feature requests are very welcome.
 
 ## API
 
@@ -139,6 +138,40 @@ You can use the following to add data to your flags:
 1. `Usage(string)` - add a usage string
 2. `Name(string)` - set the name of the flag
 3. `Default(any)` - set the flag's default value. Works only with non-pointer flags.
+
+## Subcommands & Context
+
+Goat also allows defining subcommands
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/tmr232/goat" // One explicit dependency
+)
+
+//go:generate go run github.com/tmr232/goat/cmd/goater
+
+func server(name string) {
+	
+}
+
+func app(name string, goodbye bool) {
+	if goodbye {
+		fmt.Printf("Goodbye, %s.\n", name)
+	} else {
+		fmt.Printf("Hello, %s!\n", name)
+
+	}
+}
+
+func main() {
+	// Let goat know what to run
+	goat.Run(app)
+}
+
+```
 
 ## Dependencies
 

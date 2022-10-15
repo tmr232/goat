@@ -93,41 +93,39 @@ type callTarget struct {
 }
 
 func isCallTo(target callTarget, node ast.Node, typesInfo *types.Info) bool {
-	callExpr, isCall := node.(*ast.CallExpr)
+	_, isCall := node.(*ast.CallExpr)
 	if !isCall {
 		return false
 	}
 
-	found := false
-	ast.Inspect(callExpr.Fun, func(node ast.Node) bool {
-		if found {
+	for {
+		switch current := node.(type) {
+		case *ast.CallExpr:
+			node = current.Fun
+		case *ast.SelectorExpr:
+			node = current.Sel
+		case *ast.Ident:
+			definition, exists := typesInfo.Uses[current]
+			if !exists {
+				return false
+			}
+
+			funcDef, isFunc := definition.(*types.Func)
+			if !isFunc {
+				return false
+			}
+
+			if funcDef.Pkg() == nil {
+				return false
+			}
+			if funcDef.Pkg().Path() == target.PkgPath && funcDef.Name() == target.Name {
+				return true
+			}
+			return false
+		default:
 			return false
 		}
-
-		ident, isIdent := node.(*ast.Ident)
-		if !isIdent {
-			return !found
-		}
-
-		definition, exists := typesInfo.Uses[ident]
-		if !exists {
-			return false
-		}
-
-		funcDef, isFunc := definition.(*types.Func)
-		if !isFunc {
-			return false
-		}
-
-		if funcDef.Pkg() == nil {
-			return false
-		}
-		if funcDef.Pkg().Path() == target.PkgPath && funcDef.Name() == target.Name {
-			found = true
-		}
-		return !found
-	})
-	return found
+	}
 }
 
 func (gh *Goatherd) isCallTo(node ast.Node, pkgPath, name string) bool {
