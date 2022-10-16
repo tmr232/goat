@@ -260,10 +260,8 @@ func (gh *Goatherd) parseActionDescription(f *types.Func) (ActionDescription, er
 
 	if description.Usage == nil && fdecl.Doc != nil {
 		doc := fdecl.Doc.Text()
-		if strings.HasPrefix(doc, fdecl.Name.Name) && description.Name != nil {
-			doc = strings.Replace(doc, fdecl.Name.Name, (*description.Name)[1:len(*description.Name)-1], 1)
-		}
-		text := fmt.Sprintf("%#v", strings.TrimSuffix(doc, "\n"))
+		doc = strings.TrimPrefix(doc, fdecl.Name.Name)
+		text := fmt.Sprintf("%#v", strings.TrimSpace(doc))
 		description.Usage = &text
 	}
 	return description, nil
