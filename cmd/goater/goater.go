@@ -257,6 +257,15 @@ func (gh *Goatherd) parseActionDescription(f *types.Func) (ActionDescription, er
 	if err != nil {
 		return ActionDescription{}, errors.Wrap(err, "Failed parsing ActionDescription")
 	}
+
+	if description.Usage == nil && fdecl.Doc != nil {
+		doc := fdecl.Doc.Text()
+		if strings.HasPrefix(doc, fdecl.Name.Name) && description.Name != nil {
+			doc = strings.Replace(doc, fdecl.Name.Name, (*description.Name)[1:len(*description.Name)-1], 1)
+		}
+		text := fmt.Sprintf("%#v", strings.TrimSuffix(doc, "\n"))
+		description.Usage = &text
+	}
 	return description, nil
 
 }
@@ -427,6 +436,25 @@ func makeAction(signature GoatSignature, actionDescription ActionDescription, fl
 		Usage:    usage,
 		NoError:  signature.NoError,
 	}
+}
+
+func (gh *Goatherd) getFunctionComment(f *types.Func) *string {
+	for _, file := range gh.pkg.Syntax {
+		for _, decl := range file.Decls {
+			funcDecl, isFuncDecl := decl.(*ast.FuncDecl)
+			if !isFuncDecl {
+				continue
+			}
+			if gh.pkg.TypesInfo.Defs[funcDecl.Name] == f {
+				if funcDecl.Doc == nil {
+					return nil
+				}
+				text := funcDecl.Doc.Text()
+				return &text
+			}
+		}
+	}
+	return nil
 }
 
 func main() {
