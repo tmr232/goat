@@ -19,7 +19,7 @@ import (
 
 func loadPackages() *packages.Package {
 	cfg := &packages.Config{
-		Mode:       packages.NeedTypes | packages.NeedTypesInfo | packages.NeedFiles | packages.NeedSyntax | packages.NeedName | packages.NeedImports,
+		Mode:       packages.NeedTypes | packages.NeedTypesInfo | packages.NeedFiles | packages.NeedSyntax | packages.NeedName | packages.NeedImports | packages.NeedDeps,
 		Context:    nil,
 		Logf:       nil,
 		Dir:        "",
@@ -139,14 +139,27 @@ func (gh *Goatherd) findActionFunctions() (actionFunctions []*types.Func) {
 	// we need their base definition.
 
 	for _, arg := range callArgs {
-		ident, isIdent := arg.(*ast.Ident)
-		if !isIdent {
-			//funcLit := arg.(*ast.FuncLit)
-			//fmt.Println(gh.pkg.TypesInfo.TypeOf(funcLit))
-			//fmt.Println(reflect.TypeOf(gh.pkg.TypesInfo.TypeOf(funcLit)))
-			//fmt.Println(gh.pkg.TypesInfo.TypeOf(funcLit).(*types.Signature))
+		var ident *ast.Ident
+		switch node := arg.(type) {
+		case *ast.Ident:
+			ident = node
+		case *ast.SelectorExpr:
+			x, isIdent := node.X.(*ast.Ident)
+			if isIdent {
+				obj := gh.pkg.TypesInfo.ObjectOf(x)
+				if obj != nil {
+					fmt.Println(reflect.TypeOf(obj))
+					_, isPkg := obj.(*types.PkgName)
+					if isPkg {
+						fmt.Println("yay!")
+					}
+				}
+			}
+			ident = node.Sel
+		default:
 			log.Fatalf("%s goat.Run only accepts free functions.", gh.pkg.Fset.Position(arg.Pos()))
 		}
+
 		definition, exists := gh.pkg.TypesInfo.Uses[ident]
 		if !exists {
 			log.Fatalf("%s goat.Run expects a function.", gh.pkg.Fset.Position(arg.Pos()))
@@ -321,7 +334,16 @@ func (gh *Goatherd) parseFlagDescription(callExpr *ast.CallExpr) (FlagDescriptio
 
 func (gh *Goatherd) findFuncDecl(f *types.Func) *ast.FuncDecl {
 	var fdecl *ast.FuncDecl
-	for _, syntax := range gh.pkg.Syntax {
+	// Weird hack to get the package containing the function
+	pkg := gh.pkg
+	if pkg.PkgPath != f.Pkg().Path() {
+		var ok bool
+		pkg, ok = pkg.Imports[f.Pkg().Path()]
+		if !ok {
+			log.Fatalf("Failed finding package %s", f.Pkg().Path())
+		}
+	}
+	for _, syntax := range pkg.Syntax {
 		astObj := syntax.Scope.Lookup(f.Name())
 		if astObj == nil {
 			continue
@@ -330,7 +352,7 @@ func (gh *Goatherd) findFuncDecl(f *types.Func) *ast.FuncDecl {
 		if !isFdecl {
 			continue
 		}
-		if gh.pkg.TypesInfo.Defs[decl.Name] != f {
+		if pkg.TypesInfo.Defs[decl.Name] != f {
 			continue
 		}
 		fdecl = decl
@@ -436,7 +458,7 @@ func makeAction(signature GoatSignature, actionDescription ActionDescription, fl
 	}
 }
 
-func (gh *Goatherd) getFunctionComment(f *types.Func) *string {
+func (gh *Goatherd) getFuncDecl(f *types.Func) *ast.FuncDecl {
 	for _, file := range gh.pkg.Syntax {
 		for _, decl := range file.Decls {
 			funcDecl, isFuncDecl := decl.(*ast.FuncDecl)
@@ -444,17 +466,16 @@ func (gh *Goatherd) getFunctionComment(f *types.Func) *string {
 				continue
 			}
 			if gh.pkg.TypesInfo.Defs[funcDecl.Name] == f {
-				if funcDecl.Doc == nil {
-					return nil
-				}
-				text := funcDecl.Doc.Text()
-				return &text
+				return funcDecl
 			}
 		}
 	}
 	return nil
 }
 
+//TODO: The name we create needs to be the actual name in the code (lib.Greet)
+//		and we need to ensure we correctly set up all the imports.
+//		So imports need to exactly match (name and path) the original.
 func main() {
 	gh := NewGoatherd(loadPackages())
 	var actions []Action
