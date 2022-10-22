@@ -2,9 +2,9 @@
     package {{.Package}}
 
     import (
-    "github.com/tmr232/goat"
-    "github.com/tmr232/goat/flags"
-    "github.com/urfave/cli/v2"
+        {{- range .Imports}}
+            {{ . }}
+        {{- end}}
     )
 
     {{- template "register-apps" .}}

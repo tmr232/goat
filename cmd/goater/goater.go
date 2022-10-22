@@ -132,7 +132,12 @@ func (gh *Goatherd) isCallTo(node ast.Node, pkgPath, name string) bool {
 	return isCallTo(callTarget{Name: name, PkgPath: pkgPath}, node, gh.pkg.TypesInfo)
 }
 
-func (gh *Goatherd) findActionFunctions() (actionFunctions []*types.Func) {
+type actionDefinition struct {
+	Func *types.Func
+	Def  ast.Node
+}
+
+func (gh *Goatherd) findActionFunctions() (actionFunctions []actionDefinition) {
 	callArgs := findActionCalls(gh)
 
 	// For the time being - only ast.Ident nodes will be considered valid because
@@ -168,9 +173,9 @@ func (gh *Goatherd) findActionFunctions() (actionFunctions []*types.Func) {
 		if !isFunction {
 			log.Fatalf("%s goat.Run expects a function.", gh.pkg.Fset.Position(arg.Pos()))
 		}
-		actionFunctions = append(actionFunctions, f)
+		actionFunctions = append(actionFunctions, actionDefinition{Func: f, Def: arg})
 	}
-	return
+	return actionFunctions
 }
 
 func findNodesIf[T ast.Node](file *ast.File, pred func(node T) bool) []T {
@@ -246,9 +251,7 @@ var notAFlagDescription = errors.New("Not a flag description")
 func (gh *Goatherd) reportError(node ast.Node, message string) {
 	fmt.Println(gh.pkg.Fset.Position(node.Pos()), "Error:", message)
 }
-func (gh *Goatherd) parseActionDescription(f *types.Func) (ActionDescription, error) {
-	fdecl := gh.findFuncDecl(f)
-
+func (gh *Goatherd) parseActionDescription(fdecl *ast.FuncDecl) (ActionDescription, error) {
 	var description ActionDescription
 	var err error
 	ast.Inspect(fdecl.Body, func(node ast.Node) bool {
@@ -281,9 +284,7 @@ func (gh *Goatherd) parseActionDescription(f *types.Func) (ActionDescription, er
 
 }
 
-func (gh *Goatherd) parseFlagDescriptions(f *types.Func) ([]FlagDescription, error) {
-	fdecl := gh.findFuncDecl(f)
-
+func (gh *Goatherd) parseFlagDescriptions(fdecl *ast.FuncDecl) ([]FlagDescription, error) {
 	var parseErrors []error
 
 	var descriptions []FlagDescription
@@ -397,7 +398,7 @@ func isGoatContext(typeName string) bool {
 	return typeName == goatContextTypeName
 }
 
-func makeAction(signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
+func makeAction(functionName string, signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
 	flagByArgName := make(map[string]Flag)
 	for _, arg := range signature.Args {
 		flagByArgName[arg.Name] = Flag{
@@ -450,7 +451,7 @@ func makeAction(signature GoatSignature, actionDescription ActionDescription, fl
 	}
 
 	return Action{
-		Function: signature.Name,
+		Function: functionName,
 		Flags:    flags,
 		Name:     name,
 		Usage:    usage,
@@ -473,33 +474,97 @@ func (gh *Goatherd) getFuncDecl(f *types.Func) *ast.FuncDecl {
 	return nil
 }
 
-//TODO: The name we create needs to be the actual name in the code (lib.Greet)
-//		and we need to ensure we correctly set up all the imports.
-//		So imports need to exactly match (name and path) the original.
+type ImportByName map[string]*ast.ImportSpec
+
+func (gh *Goatherd) getImports() ImportByName {
+	importsByName := make(ImportByName, 0)
+	for _, importSpec := range gh.pkg.Syntax[0].Imports {
+		var name string
+		if importSpec.Name != nil {
+			name = importSpec.Name.Name
+		} else {
+			p := gh.pkg.Imports[strings.Trim(importSpec.Path.Value, "\"")]
+			name = p.Name
+		}
+		importsByName[name] = importSpec
+	}
+
+	return importsByName
+}
+
+func (gh *Goatherd) createAction(actionFunc actionDefinition) (Action, error) {
+	// The AST declaration is used in multiple places, so we get it here.
+	fdecl := gh.findFuncDecl(actionFunc.Func)
+	signature, err := gh.parseSignature(actionFunc.Func)
+	if err != nil {
+		log.Fatal(err)
+	}
+	actionDescription, err := gh.parseActionDescription(fdecl)
+	if err != nil {
+		log.Fatal(err)
+	}
+	flagDescriptions, err := gh.parseFlagDescriptions(fdecl)
+	if err != nil {
+		log.Fatal(err)
+	}
+	functionName, err := formatNode(gh.pkg.Fset, actionFunc.Def)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return makeAction(functionName, signature, actionDescription, flagDescriptions), nil
+}
+
 func main() {
 	gh := NewGoatherd(loadPackages())
 	var actions []Action
-	for _, actionFunc := range gh.findActionFunctions() {
-		signature, err := gh.parseSignature(actionFunc)
+	usedImports := make(map[string]bool)
+	for _, actionFuncDefinition := range gh.findActionFunctions() {
+		if selector, isSelector := actionFuncDefinition.Def.(*ast.SelectorExpr); isSelector {
+			usedImports[selector.X.(*ast.Ident).Name] = true
+
+		}
+		action, err := gh.createAction(actionFuncDefinition)
 		if err != nil {
 			log.Fatal(err)
 		}
-		actionDescription, err := gh.parseActionDescription(actionFunc)
-		if err != nil {
-			log.Fatal(err)
-		}
-		flagDescriptions, err := gh.parseFlagDescriptions(actionFunc)
-		if err != nil {
-			log.Fatal(err)
-		}
-		actions = append(actions, makeAction(signature, actionDescription, flagDescriptions))
+		actions = append(actions, action)
 	}
+
+	importsByPath := make(map[string]*string)
+	for name, spec := range gh.getImports() {
+		if !usedImports[name] {
+			continue
+		}
+		var alias *string
+		if spec.Name != nil {
+			alias = &spec.Name.Name
+		}
+		importsByPath[spec.Path.Value] = alias
+	}
+
+	baseImports := []string{
+		"\"github.com/tmr232/goat\"",
+		"\"github.com/tmr232/goat/flags\"",
+		"\"github.com/urfave/cli/v2\"",
+	}
+
+	imports := append([]string{}, baseImports...)
+	for path, name := range importsByPath {
+		if name == nil {
+			imports = append(imports, path)
+		} else {
+			imports = append(imports, *name+" "+path)
+		}
+	}
+
 	data := struct {
 		Package string
 		Actions []Action
+		Imports []string
 	}{
 		Package: gh.pkg.Name,
 		Actions: actions,
+		Imports: imports,
 	}
 	file, err := gh.Render("goat-file", data)
 	if err != nil {
