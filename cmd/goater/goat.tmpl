@@ -35,7 +35,7 @@
         {{- template "function-call" . }}
         return nil
     {{- else}}
-        return {{- template "function-call" . -}}
+        return {{ template "function-call" . -}}
     {{- end}}
     },
     CtxFlagBuilder: func(c *cli.Context) map[string]any {
@@ -50,14 +50,14 @@
     })
 {{end}}
 
-{{- define "function-call"}}
+{{- define "function-call" -}}
     {{.Function}}(
     {{- range .Flags}}
-        {{ if .IsContext }}
+        {{-  if .IsContext }}
             goat.GetContext(c),
-        {{else}}
+        {{- else}}
             flags.GetFlag[{{.Type}}](c, {{.Name}}),
-        {{end}}
+        {{- end}}
     {{- end}}
     )
 {{- end}}
