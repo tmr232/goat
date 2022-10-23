@@ -35,8 +35,7 @@ func Register(app any, config RunConfig) {
 	functionByCliActionFunc[reflect.ValueOf(config.Action)] = appValue
 }
 
-// RunE takes a free function and runs it as a CLI app.
-func RunE(f any) error {
+func RunWithArgsE(f any, args []string) error {
 	config := runConfigByFunction[reflect.ValueOf(f)]
 
 	app := &cli.App{
@@ -46,7 +45,12 @@ func RunE(f any) error {
 		Usage:  config.Usage,
 	}
 
-	return app.Run(os.Args)
+	return app.Run(args)
+}
+
+// RunE takes a free function and runs it as a CLI app.
+func RunE(f any) error {
+	return RunWithArgsE(f, os.Args)
 }
 
 // Run takes a free function and runs it as a CLI app, terminating with a log if an error occurs.
