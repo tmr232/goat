@@ -107,3 +107,17 @@ func Test_subcommands(t *testing.T) {
 		})
 	}
 }
+
+func TestApp(t *testing.T) {
+	for _, cmd := range appCmds {
+		args := append([]string{"test-app"}, strings.Split(cmd, " ")...)
+		stdout := &bytes.Buffer{}
+		stdout.WriteString(strings.Join(args, " ") + "\n")
+		stdout.WriteString("-----------------------------------------------------\n\n")
+		app := getApp(stdout, nil)
+		t.Run(cmd, func(t *testing.T) {
+			_ = app.RunWithArgsE(args)
+			approvals.Verify(t, stdout)
+		})
+	}
+}

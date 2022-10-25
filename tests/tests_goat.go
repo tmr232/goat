@@ -7,6 +7,45 @@ import (
 )
 
 func init() {
+	goat.Register(NoFlags, goat.RunConfig{
+		Flags: []cli.Flag{},
+		Name:  "NoFlags",
+		Usage: "has no flags.",
+		Action: func(c *cli.Context) error {
+			NoFlags()
+			return nil
+		},
+		CtxFlagBuilder: func(c *cli.Context) map[string]any {
+			cflags := make(map[string]any)
+			return cflags
+		},
+	})
+
+	goat.Register(FlagsWithUsage, goat.RunConfig{
+		Flags: []cli.Flag{
+			flags.MakeFlag[int]("a", "This is a", nil).AsCliFlag(),
+			flags.MakeFlag[int]("b", "Nice!", nil).AsCliFlag(),
+			flags.MakeFlag[int]("c", "C.", nil).AsCliFlag(),
+		},
+		Name:  "FlagsWithUsage",
+		Usage: "has usage for its flags!",
+		Action: func(c *cli.Context) error {
+			FlagsWithUsage(
+				flags.GetFlag[int](c, "a"),
+				flags.GetFlag[int](c, "b"),
+				flags.GetFlag[int](c, "c"),
+			)
+			return nil
+		},
+		CtxFlagBuilder: func(c *cli.Context) map[string]any {
+			cflags := make(map[string]any)
+			cflags["a"] = flags.GetFlag[int](c, "a")
+			cflags["b"] = flags.GetFlag[int](c, "b")
+			cflags["c"] = flags.GetFlag[int](c, "c")
+			return cflags
+		},
+	})
+
 	goat.Register(noFlags, goat.RunConfig{
 		Flags: []cli.Flag{},
 		Name:  "noFlags",

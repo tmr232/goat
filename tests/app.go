@@ -2,35 +2,29 @@ package tests
 
 import (
 	"github.com/tmr232/goat"
+	"io"
 )
 
-//go:generate go run github.com/tmr232/goat/cmd/goater
+// NoFlags has no flags.
+func NoFlags() {}
 
-func noFlags()         {}
-func intFlag(flag int) {}
-func renamedFlag(bla int) {
-	goat.Flag(bla).Name("flag")
+// FlagsWithUsage has usage for its flags!
+func FlagsWithUsage(a, b, c int) {
+	goat.Flag(a).Usage("This is a")
+	goat.Flag(b).Usage("Nice!")
+	goat.Flag(c).Usage("C.")
 }
 
-// Documented has some neat docs!
-//
-// It's just so nice to document your code.
-func Documented() {}
+func getApp(stdout, stderr io.Writer) goat.Application {
+	app := goat.App("test-app", goat.Command(NoFlags), goat.Command(FlagsWithUsage))
+	app.Writer = stdout
+	app.ErrWriter = stderr
 
-func flagUsage(num int, str string) {
-	goat.Flag(num).Usage("A number of things.")
-	goat.Flag(str).Usage("A piece of text.")
+	return app
 }
 
-func defaultValue(num int) {
-	goat.Flag(num).Default(5)
-}
-
-func Register() {
-	goat.Command(noFlags)
-	goat.Command(intFlag)
-	goat.Command(renamedFlag)
-	goat.Command(Documented)
-	goat.Command(flagUsage)
-	goat.Command(defaultValue)
+var appCmds = []string{
+	"NoFlags --help",
+	"NoFlags --a-flag",
+	"FlagsWithUsage --help",
 }
