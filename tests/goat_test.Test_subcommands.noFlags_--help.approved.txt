@@ -1,0 +1,11 @@
+test-app noFlags --help
+-----------------------------------------------------
+
+NAME:
+   test-app noFlags
+
+USAGE:
+   test-app noFlags [command options] [arguments...]
+
+OPTIONS:
+   --help, -h  show help (default: false)

@@ -1,0 +1,13 @@
+test-app Documented --help
+-----------------------------------------------------
+
+NAME:
+   test-app Documented - has some neat docs!
+
+                         It's just so nice to document your code.
+
+USAGE:
+   test-app Documented [command options] [arguments...]
+
+OPTIONS:
+   --help, -h  show help (default: false)
