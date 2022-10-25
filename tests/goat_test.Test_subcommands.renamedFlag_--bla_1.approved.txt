@@ -1,0 +1,14 @@
+test-app renamedFlag --bla 1
+-----------------------------------------------------
+
+Incorrect Usage: flag provided but not defined: -bla
+
+NAME:
+   test-app renamedFlag
+
+USAGE:
+   test-app renamedFlag [command options] [arguments...]
+
+OPTIONS:
+   --flag value  (default: 0)
+   --help, -h    show help (default: false)

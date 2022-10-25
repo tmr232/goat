@@ -1,0 +1,12 @@
+test-app defaultValue --help
+-----------------------------------------------------
+
+NAME:
+   test-app defaultValue
+
+USAGE:
+   test-app defaultValue [command options] [arguments...]
+
+OPTIONS:
+   --num value  (default: 5)
+   --help, -h   show help (default: false)

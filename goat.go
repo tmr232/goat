@@ -48,6 +48,18 @@ func RunWithArgsE(f any, args []string) error {
 	return app.Run(args)
 }
 
+func FuncToApp(f any) *cli.App {
+	config := runConfigByFunction[reflect.ValueOf(f)]
+
+	app := &cli.App{
+		Flags:  config.Flags,
+		Action: config.Action,
+		Name:   config.Name,
+		Usage:  config.Usage,
+	}
+	return app
+}
+
 // RunE takes a free function and runs it as a CLI app.
 func RunE(f any) error {
 	return RunWithArgsE(f, os.Args)
@@ -114,6 +126,10 @@ func Group(name string, subcommands ...AppPart) *GoatGroup {
 }
 
 type Application struct{ *cli.App }
+
+func (app Application) RunWithArgsE(args []string) error {
+	return app.App.Run(args)
+}
 
 func (app Application) RunE() error {
 	return app.App.Run(os.Args)

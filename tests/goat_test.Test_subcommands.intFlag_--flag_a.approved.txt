@@ -1,0 +1,14 @@
+test-app intFlag --flag a
+-----------------------------------------------------
+
+Incorrect Usage: invalid value "a" for flag -flag: parse error
+
+NAME:
+   test-app intFlag
+
+USAGE:
+   test-app intFlag [command options] [arguments...]
+
+OPTIONS:
+   --flag value  (default: 0)
+   --help, -h    show help (default: false)
