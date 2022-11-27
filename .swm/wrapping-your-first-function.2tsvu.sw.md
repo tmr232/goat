@@ -4,27 +4,27 @@ name: Wrapping your first function
 file_version: 1.0.2
 app_version: 0.10.0-2
 file_blobs:
-  sample/main.go: e143efd2009fdb26190783cf8e0fe6d607611ab5
+  sample/main.go: fc6875eae871d4dbc10acbb73d868d3784b36099
   goat.go: 83a971049dec9c67a6c28eb47be10f43e3347c1d
 ---
 
-To add a function to the CLI app interface add a call to `goat.App`[<sup id="Z1039BV">↓</sup>](#f-Z1039BV) with with a `goat.Command`[<sup id="2lWAG5">↓</sup>](#f-2lWAG5) and your function ( `app`[<sup id="Z1GF2bO">↓</sup>](#f-Z1GF2bO)).  
-Don't forget to call `Run()`[<sup id="2kl6B3">↓</sup>](#f-2kl6B3) `Run()`[<sup id="2kl6B3">↓</sup>](#f-2kl6B3)
+To add a function to the CLI app interface add a call to `goat.App`[<sup id="19uKFy">↓</sup>](#f-19uKFy) with with a `goat.Command`[<sup id="Z2rMq5x">↓</sup>](#f-Z2rMq5x) and your function ( `app`[<sup id="1R5sHl">↓</sup>](#f-1R5sHl).  
+Don't forget to call `Run()`[<sup id="Z2toUaz">↓</sup>](#f-Z2toUaz) `Run()`[<sup id="Z2toUaz">↓</sup>](#f-Z2toUaz)
 <!-- NOTE-swimm-snippet: the lines below link your snippet to Swimm -->
 ### 📄 sample/main.go
 ```go
-⬜ 54     	return errors.New(msg)
-⬜ 55     }
-⬜ 56     
-🟩 57     func main() {
-🟩 58     	goat.App("greeter",
-🟩 59     		goat.Command(hello),
-🟩 60     		goat.Command(greet),
-🟩 61     		goat.Command(fail),
-🟩 62     		goat.Command(app),
-🟩 63     	).Run()
-🟩 64     }
-⬜ 65     
+⬜ 56     	return errors.New(msg)
+⬜ 57     }
+⬜ 58     
+🟩 59     func main() {
+🟩 60     
+🟩 61     	goat.App("my-app",
+🟩 62     		goat.Command(hello),
+🟩 63     		goat.Command(greet),
+🟩 64     		goat.Command(fail),
+🟩 65     		goat.Command(app),
+🟩 66     	).Run()
+🟩 67     }
 ```
 
 <br/>
@@ -33,44 +33,44 @@ Don't forget to call `Run()`[<sup id="2kl6B3">↓</sup>](#f-2kl6B3) `Run()`[<sup
 
 <br/>
 
-`Goat` has defaults for understanding your function's arguments. But you can add more options using `Flag`[<sup id="bgf28">↓</sup>](#f-bgf28). You can define the `Usage`[<sup id="Z28LpK0">↓</sup>](#f-Z28LpK0), `Name`[<sup id="Zm7vnb">↓</sup>](#f-Zm7vnb)and `Default`[<sup id="29qqV7">↓</sup>](#f-29qqV7) values.
+`Goat` has defaults for understanding your function's arguments. But you can add more options using `Flag`[<sup id="bgf28">↓</sup>](#f-bgf28). You can define the `Usage`[<sup id="1pY59a">↓</sup>](#f-1pY59a), `Name`[<sup id="xDXe">↓</sup>](#f-xDXe)and `Default`[<sup id="CYN1l">↓</sup>](#f-CYN1l) values.
 <!-- NOTE-swimm-snippet: the lines below link your snippet to Swimm -->
 ### 📄 sample/main.go
 ```go
-⬜ 8      
-⬜ 9      //go:generate go run github.com/tmr232/goat/cmd/goater
 ⬜ 10     
-🟩 11     func app(name string, goodbye bool, question *string, times int) error {
-🟩 12     	goat.Self().
-🟩 13     		Name("application").
-🟩 14     		Usage("usage")
-🟩 15     	goat.Flag(name).
-🟩 16     		Usage("The name to greet")
-🟩 17     	goat.Flag(goodbye).
-🟩 18     		Name("bye").
-🟩 19     		Usage("Enable to say Goodbye")
-🟩 20     	goat.Flag(question).
-🟩 21     		Usage("Instead of a greeting, ask a question.")
-🟩 22     	goat.Flag(times).
-🟩 23     		Usage("Number of repetitions").
-🟩 24     		Default(1)
-🟩 25     
-🟩 26     	for i := 0; i < times; i++ {
-🟩 27     		if question != nil {
-🟩 28     			fmt.Printf("%s, %s?", *question, name)
-🟩 29     		} else {
-🟩 30     			if goodbye {
-🟩 31     				fmt.Printf("Goodbye, %s.\n", name)
-🟩 32     			} else {
-🟩 33     				fmt.Printf("Hello, %s!\n", name)
-🟩 34     			}
-🟩 35     		}
-🟩 36     	}
-🟩 37     	return nil
-🟩 38     }
-⬜ 39     
-⬜ 40     func hello() error {
-⬜ 41     	goat.Self().
+⬜ 11     
+⬜ 12     
+🟩 13     func app(name string, goodbye bool, question *string, times int) error {
+🟩 14     	goat.Self().
+🟩 15     		Name("application").
+🟩 16     		Usage("app usage")
+🟩 17     	goat.Flag(name).
+🟩 18     		Usage("The name to greet")
+🟩 19     	goat.Flag(goodbye).
+🟩 20     		Name("bye").
+🟩 21     		Usage("Enable to say Goodbye")
+🟩 22     	goat.Flag(question).
+🟩 23     		Usage("Instead of a greeting, ask a question.")
+🟩 24     	goat.Flag(times).
+🟩 25     		Usage("Number of repetitions").
+🟩 26     		Default(1)
+🟩 27     
+🟩 28     	for i := 0; i < times; i++ {
+🟩 29     		if question != nil {
+🟩 30     			fmt.Printf("%s, %s?", *question, name)
+🟩 31     		} else {
+🟩 32     			if goodbye {
+🟩 33     				fmt.Printf("Goodbye, %s.\n", name)
+🟩 34     			} else {
+🟩 35     				fmt.Printf("Hello, %s!\n", name)
+🟩 36     			}
+🟩 37     		}
+🟩 38     	}
+🟩 39     	return nil
+🟩 40     }
+⬜ 41     
+⬜ 42     func hello() error {
+⬜ 43     	goat.Self().
 ```
 
 <br/>
@@ -78,23 +78,27 @@ Don't forget to call `Run()`[<sup id="2kl6B3">↓</sup>](#f-2kl6B3) `Run()`[<sup
 <!--MERMAID {width:100}-->
 ```mermaid
 graph TD
-
-A[ app] --> B[ goat.App]
+A[ app] --> B[ App]
 ```
-<!--MCONTENT {content: graph TD  
-A\[ `app`[<sup id="Z1GF2bO">↓</sup>](#f-Z1GF2bO)\] \-\-\> B\[ `goat.App`[<sup id="Z1039BV">↓</sup>](#f-Z1039BV)\]} --->
+<!--MCONTENT {content: graph TD
+A\[ `app`[<sup id="1R5sHl">↓</sup>](#f-1R5sHl)\] \-\-\> B\[ `App`[<sup id="1PFvc4">↓</sup>](#f-1PFvc4)\]} --->
 
 <br/>
 
 <!-- THIS IS AN AUTOGENERATED SECTION. DO NOT EDIT THIS SECTION DIRECTLY -->
 ### Swimm Note
 
-<span id="f-Z1GF2bO">app</span>[^](#Z1GF2bO) - "sample/main.go" L11
+<span id="f-1R5sHl">app</span>[^](#1R5sHl) - "sample/main.go" L13
 ```go
 func app(name string, goodbye bool, question *string, times int) error {
 ```
 
-<span id="f-29qqV7">Default</span>[^](#29qqV7) - "sample/main.go" L24
+<span id="f-1PFvc4">App</span>[^](#1PFvc4) - "sample/main.go" L61
+```go
+	goat.App("my-app",
+```
+
+<span id="f-CYN1l">Default</span>[^](#CYN1l) - "sample/main.go" L26
 ```go
 		Default(1)
 ```
@@ -104,29 +108,29 @@ func app(name string, goodbye bool, question *string, times int) error {
 func Flag(any) FluentFlag {
 ```
 
-<span id="f-Z1039BV">goat.App</span>[^](#Z1039BV) - "sample/main.go" L58
+<span id="f-19uKFy">goat.App</span>[^](#19uKFy) - "sample/main.go" L61
 ```go
-	goat.App("greeter",
+	goat.App("my-app",
 ```
 
-<span id="f-2lWAG5">goat.Command</span>[^](#2lWAG5) - "sample/main.go" L62
+<span id="f-Z2rMq5x">goat.Command</span>[^](#Z2rMq5x) - "sample/main.go" L65
 ```go
 		goat.Command(app),
 ```
 
-<span id="f-Zm7vnb">Name</span>[^](#Zm7vnb) - "sample/main.go" L18
+<span id="f-xDXe">Name</span>[^](#xDXe) - "sample/main.go" L20
 ```go
 		Name("bye").
 ```
 
-<span id="f-2kl6B3">Run()</span>[^](#2kl6B3) - "sample/main.go" L63
+<span id="f-Z2toUaz">Run()</span>[^](#Z2toUaz) - "sample/main.go" L66
 ```go
 	).Run()
 ```
 
-<span id="f-Z28LpK0">Usage</span>[^](#Z28LpK0) - "sample/main.go" L14
+<span id="f-1pY59a">Usage</span>[^](#1pY59a) - "sample/main.go" L16
 ```go
-		Usage("usage")
+		Usage("app usage")
 ```
 
 <br/>
