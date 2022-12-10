@@ -58,9 +58,6 @@ The argument passed to `RegisterTypeHandler`[<sup id="ZwhpXt">↓</sup>](#f-Zwhp
 <!-- NOTE-swimm-snippet: the lines below link your snippet to Swimm -->
 ### 📄 flags/flags.go
 ```go
-⬜ 16     //
-⬜ 17     // MakeFlag creates a flag based on its description.
-⬜ 18     // GetFlag gets the value of a flag.
 🟩 19     type TypeHandler interface {
 🟩 20     	MakeFlag(name, usage string, defaultValue any) cli.Flag
 🟩 21     	GetFlag(c *cli.Context, name string) any
