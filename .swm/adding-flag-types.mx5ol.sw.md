@@ -4,16 +4,16 @@ name: Adding Flag Types
 file_version: 1.0.2
 app_version: 0.10.1-2
 file_blobs:
-  flags/flags.go: b13db0923126b1a8d63312a611140bac1200d70f
+  flags/flags.go: 5eb6c934dfbb3e96950a2288bf2c9d7a27527a98
   goat.go: 31207983ab5cfebe7ab79d65ed931e5050afb959
 ---
 
-For every type we use in our Goat functions (invoked with `Run`[<sup id="ZlCxof">↓</sup>](#f-ZlCxof)), we need to have a matching flag type.<br/>
+For every type we use in our Goat functions (invoked with `Run`[<sup id="ZlCxof">↓</sup>](#f-ZlCxof), we need to have a matching flag type.<br/>
 The flag type allows Goat to properly parse and handle the input from the CLI.
 
 ## Registering a Flag Type
 
-To add a flag type, we need to register it's handler. This is done using `RegisterTypeHandler`[<sup id="l1Uxz">↓</sup>](#f-l1Uxz) as follows:
+To add a flag type, we need to register it's handler. This is done using `RegisterTypeHandler`[<sup id="1Odvym">↓</sup>](#f-1Odvym) as follows:
 
 <br/>
 
@@ -23,28 +23,32 @@ To add a flag type, we need to register it's handler. This is done using `Regist
 <!-- NOTE-swimm-snippet: the lines below link your snippet to Swimm -->
 ### 📄 flags/flags.go
 ```go
-🟩 77     	RegisterTypeHandler[int](&typeHandlerImpl{
-🟩 78     		makeFlag: func(name, usage string, defaultValue any) Flag {
-🟩 79     			if defaultValue == nil {
-🟩 80     				return flags.RequiredIntFlag{Name: name, Usage: usage}
-🟩 81     			}
-🟩 82     			return flags.DefaultIntFlag{
-🟩 83     				Name:    name,
-🟩 84     				Usage:   usage,
-🟩 85     				Default: tryCast[int](defaultValue),
-🟩 86     			}
-🟩 87     		},
-🟩 88     		getFlag: func(c *cli.Context, name string) any {
-🟩 89     			return c.Int(name)
-🟩 90     		},
-🟩 91     	})
+🟩 60     	RegisterTypeHandler[int](&typeHandlerImpl{
+🟩 61     		makeFlag: func(name, usage string, defaultValue any) cli.Flag {
+🟩 62     			if defaultValue == nil {
+🟩 63     				return &cli.IntFlag{
+🟩 64     					Name:     name,
+🟩 65     					Usage:    usage,
+🟩 66     					Required: true,
+🟩 67     				}
+🟩 68     			}
+🟩 69     			return &cli.IntFlag{
+🟩 70     				Name:  name,
+🟩 71     				Usage: usage,
+🟩 72     				Value: tryCast[int](defaultValue),
+🟩 73     			}
+🟩 74     		},
+🟩 75     		getFlag: func(c *cli.Context, name string) any {
+🟩 76     			return c.Int(name)
+🟩 77     		},
+🟩 78     	})
 ```
 
 <br/>
 
-With `int`[<sup id="Zs7ru2">↓</sup>](#f-Zs7ru2) being the type we want to handle.
+With `int`[<sup id="Z2b1c20">↓</sup>](#f-Z2b1c20) being the type we want to handle.
 
-The argument passed to `RegisterTypeHandler`[<sup id="1bBjyu">↓</sup>](#f-1bBjyu) must be implement the `TypeHandler`[<sup id="Z2ahExo">↓</sup>](#f-Z2ahExo) interface:
+The argument passed to `RegisterTypeHandler`[<sup id="ZwhpXt">↓</sup>](#f-ZwhpXt) must be implement the `TypeHandler`[<sup id="ZG64wB">↓</sup>](#f-ZG64wB) interface:
 
 <br/>
 
@@ -54,18 +58,18 @@ The argument passed to `RegisterTypeHandler`[<sup id="1bBjyu">↓</sup>](#f-1bBj
 <!-- NOTE-swimm-snippet: the lines below link your snippet to Swimm -->
 ### 📄 flags/flags.go
 ```go
-⬜ 33     //
-⬜ 34     // MakeFlag creates a flag based on its description.
-⬜ 35     // GetFlag gets the value of a flag.
-🟩 36     type TypeHandler interface {
-🟩 37     	MakeFlag(name, usage string, defaultValue any) Flag
-🟩 38     	GetFlag(c *cli.Context, name string) any
-🟩 39     }
+⬜ 16     //
+⬜ 17     // MakeFlag creates a flag based on its description.
+⬜ 18     // GetFlag gets the value of a flag.
+🟩 19     type TypeHandler interface {
+🟩 20     	MakeFlag(name, usage string, defaultValue any) cli.Flag
+🟩 21     	GetFlag(c *cli.Context, name string) any
+🟩 22     }
 ```
 
 <br/>
 
-The `GetFlag`[<sup id="Z1cpu0u">↓</sup>](#f-Z1cpu0u) function should fetch the value of the flag from the CLI app:
+The `GetFlag`[<sup id="29RTgt">↓</sup>](#f-29RTgt) function should fetch the value of the flag from the CLI app:
 
 <br/>
 
@@ -73,14 +77,14 @@ The `GetFlag`[<sup id="Z1cpu0u">↓</sup>](#f-Z1cpu0u) function should fetch the
 <!-- NOTE-swimm-snippet: the lines below link your snippet to Swimm -->
 ### 📄 flags/flags.go
 ```go
-🟩 88     		getFlag: func(c *cli.Context, name string) any {
-🟩 89     			return c.Int(name)
-🟩 90     		},
+🟩 75     		getFlag: func(c *cli.Context, name string) any {
+🟩 76     			return c.Int(name)
+🟩 77     		},
 ```
 
 <br/>
 
-Whiel the `MakeFlag`[<sup id="NWxAl">↓</sup>](#f-NWxAl) should instantiate a struct representing the flag:
+While the `MakeFlag`[<sup id="ZSVbVC">↓</sup>](#f-ZSVbVC) return a valid `cli.Flag`[<sup id="ZrPB9l">↓</sup>](#f-ZrPB9l):
 
 <br/>
 
@@ -88,19 +92,21 @@ Whiel the `MakeFlag`[<sup id="NWxAl">↓</sup>](#f-NWxAl) should instantiate a s
 <!-- NOTE-swimm-snippet: the lines below link your snippet to Swimm -->
 ### 📄 flags/flags.go
 ```go
-🟩 78     		makeFlag: func(name, usage string, defaultValue any) Flag {
-🟩 79     			if defaultValue == nil {
-🟩 80     				return flags.RequiredIntFlag{Name: name, Usage: usage}
-🟩 81     			}
-🟩 82     			return flags.DefaultIntFlag{
-🟩 83     				Name:    name,
-🟩 84     				Usage:   usage,
-🟩 85     				Default: tryCast[int](defaultValue),
-🟩 86     			}
-🟩 87     		},
+🟩 61     		makeFlag: func(name, usage string, defaultValue any) cli.Flag {
+🟩 62     			if defaultValue == nil {
+🟩 63     				return &cli.IntFlag{
+🟩 64     					Name:     name,
+🟩 65     					Usage:    usage,
+🟩 66     					Required: true,
+🟩 67     				}
+🟩 68     			}
+🟩 69     			return &cli.IntFlag{
+🟩 70     				Name:  name,
+🟩 71     				Usage: usage,
+🟩 72     				Value: tryCast[int](defaultValue),
+🟩 73     			}
+🟩 74     		},
 ```
-
-<br/>
 
 <br/>
 
@@ -111,27 +117,32 @@ Whiel the `MakeFlag`[<sup id="NWxAl">↓</sup>](#f-NWxAl) should instantiate a s
 <!-- THIS IS AN AUTOGENERATED SECTION. DO NOT EDIT THIS SECTION DIRECTLY -->
 ### Swimm Note
 
-<span id="f-Z1cpu0u">GetFlag</span>[^](#Z1cpu0u) - "flags/flags.go" L38
+<span id="f-ZrPB9l">cli.Flag</span>[^](#ZrPB9l) - "flags/flags.go" L20
+```go
+	MakeFlag(name, usage string, defaultValue any) cli.Flag
+```
+
+<span id="f-29RTgt">GetFlag</span>[^](#29RTgt) - "flags/flags.go" L21
 ```go
 	GetFlag(c *cli.Context, name string) any
 ```
 
-<span id="f-Zs7ru2">int</span>[^](#Zs7ru2) - "flags/flags.go" L77
+<span id="f-Z2b1c20">int</span>[^](#Z2b1c20) - "flags/flags.go" L60
 ```go
 	RegisterTypeHandler[int](&typeHandlerImpl{
 ```
 
-<span id="f-NWxAl">MakeFlag</span>[^](#NWxAl) - "flags/flags.go" L37
+<span id="f-ZSVbVC">MakeFlag</span>[^](#ZSVbVC) - "flags/flags.go" L20
 ```go
-	MakeFlag(name, usage string, defaultValue any) Flag
+	MakeFlag(name, usage string, defaultValue any) cli.Flag
 ```
 
-<span id="f-l1Uxz">RegisterTypeHandler</span>[^](#l1Uxz) - "flags/flags.go" L53
+<span id="f-1Odvym">RegisterTypeHandler</span>[^](#1Odvym) - "flags/flags.go" L36
 ```go
 func RegisterTypeHandler[T any](handler TypeHandler) {
 ```
 
-<span id="f-1bBjyu">RegisterTypeHandler</span>[^](#1bBjyu) - "flags/flags.go" L77
+<span id="f-ZwhpXt">RegisterTypeHandler</span>[^](#ZwhpXt) - "flags/flags.go" L60
 ```go
 	RegisterTypeHandler[int](&typeHandlerImpl{
 ```
@@ -141,7 +152,7 @@ func RegisterTypeHandler[T any](handler TypeHandler) {
 func Run(f any) {
 ```
 
-<span id="f-Z2ahExo">TypeHandler</span>[^](#Z2ahExo) - "flags/flags.go" L36
+<span id="f-ZG64wB">TypeHandler</span>[^](#ZG64wB) - "flags/flags.go" L19
 ```go
 type TypeHandler interface {
 ```
