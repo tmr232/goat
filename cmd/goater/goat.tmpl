@@ -24,7 +24,7 @@
     Flags: []cli.Flag{
     {{- range .Flags}}
         {{- if not .IsContext}}
-            flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}).AsCliFlag(),
+            flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}),
         {{- end}}
     {{- end}}
     },

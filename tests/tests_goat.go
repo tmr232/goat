@@ -23,9 +23,9 @@ func init() {
 
 	goat.Register(FlagsWithUsage, goat.RunConfig{
 		Flags: []cli.Flag{
-			flags.MakeFlag[int]("a", "This is a", nil).AsCliFlag(),
-			flags.MakeFlag[int]("b", "Nice!", nil).AsCliFlag(),
-			flags.MakeFlag[int]("c", "C.", nil).AsCliFlag(),
+			flags.MakeFlag[int]("a", "This is a", nil),
+			flags.MakeFlag[int]("b", "Nice!", nil),
+			flags.MakeFlag[int]("c", "C.", nil),
 		},
 		Name:  "FlagsWithUsage",
 		Usage: "has usage for its flags!",
@@ -62,7 +62,7 @@ func init() {
 
 	goat.Register(intFlag, goat.RunConfig{
 		Flags: []cli.Flag{
-			flags.MakeFlag[int]("flag", "", nil).AsCliFlag(),
+			flags.MakeFlag[int]("flag", "", nil),
 		},
 		Name:  "intFlag",
 		Usage: "",
@@ -81,7 +81,7 @@ func init() {
 
 	goat.Register(renamedFlag, goat.RunConfig{
 		Flags: []cli.Flag{
-			flags.MakeFlag[int]("flag", "", nil).AsCliFlag(),
+			flags.MakeFlag[int]("flag", "", nil),
 		},
 		Name:  "renamedFlag",
 		Usage: "",
@@ -114,8 +114,8 @@ func init() {
 
 	goat.Register(flagUsage, goat.RunConfig{
 		Flags: []cli.Flag{
-			flags.MakeFlag[int]("num", "A number of things.", nil).AsCliFlag(),
-			flags.MakeFlag[string]("str", "A piece of text.", nil).AsCliFlag(),
+			flags.MakeFlag[int]("num", "A number of things.", nil),
+			flags.MakeFlag[string]("str", "A piece of text.", nil),
 		},
 		Name:  "flagUsage",
 		Usage: "",
@@ -136,7 +136,7 @@ func init() {
 
 	goat.Register(defaultValue, goat.RunConfig{
 		Flags: []cli.Flag{
-			flags.MakeFlag[int]("num", "", 5).AsCliFlag(),
+			flags.MakeFlag[int]("num", "", 5),
 		},
 		Name:  "defaultValue",
 		Usage: "",
