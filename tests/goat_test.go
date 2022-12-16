@@ -60,6 +60,9 @@ func Test_apps(t *testing.T) {
 		{"defaultValue --help", args{defaultValue, Args("--help")}},
 		{"defaultValue --num 8", args{defaultValue, Args("--num", "8")}},
 		{"defaultValue", args{defaultValue, Args()}},
+		{"optionalFlag --help", args{optionalFlag, Args("--help")}},
+		{"optionalFlag", args{optionalFlag, Args()}},
+		{"optionalFlag --num 10", args{optionalFlag, Args("--num", "10")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

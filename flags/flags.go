@@ -157,7 +157,12 @@ func GetFlag[T any](c *cli.Context, name string) T {
 	if !exists {
 		panic("oh no!")
 	}
-	return handler.GetFlag(c, name).(T)
+	flag := handler.GetFlag(c, name)
+	if flag == nil {
+		// This should only happen for optional flags, when they are not provided values.
+		return *new(T)
+	}
+	return flag.(T)
 }
 
 /*
