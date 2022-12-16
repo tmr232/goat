@@ -152,4 +152,23 @@ func init() {
 			return cflags
 		},
 	})
+
+	goat.Register(optionalFlag, goat.RunConfig{
+		Flags: []cli.Flag{
+			flags.MakeFlag[*int]("num", "This flag is optional!", nil),
+		},
+		Name:  "optionalFlag",
+		Usage: "",
+		Action: func(c *cli.Context) error {
+			optionalFlag(
+				flags.GetFlag[*int](c, "num"),
+			)
+			return nil
+		},
+		CtxFlagBuilder: func(c *cli.Context) map[string]any {
+			cflags := make(map[string]any)
+			cflags["num"] = flags.GetFlag[*int](c, "num")
+			return cflags
+		},
+	})
 }

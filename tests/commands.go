@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"github.com/tmr232/goat"
 )
 
@@ -26,6 +27,15 @@ func defaultValue(num int) {
 	goat.Flag(num).Default(5)
 }
 
+func optionalFlag(num *int) {
+	goat.Flag(num).Usage("This flag is optional!")
+
+	if num == nil {
+		fmt.Printf("No value provided.")
+	}
+	fmt.Println(num)
+}
+
 func Register() {
 	goat.Command(noFlags)
 	goat.Command(intFlag)
@@ -33,4 +43,5 @@ func Register() {
 	goat.Command(Documented)
 	goat.Command(flagUsage)
 	goat.Command(defaultValue)
+	goat.Command(optionalFlag)
 }
