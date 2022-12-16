@@ -26,6 +26,7 @@ jobs:
         run: go generate ./...
 
       - name: Upload Generated Code
+        if: ${{ always() }}
         uses: actions/upload-artifact@v3
         with:
           name: Goater-Generated-${{ matrix.go-version }}
