@@ -27,13 +27,14 @@ func defaultValue(num int) {
 	goat.Flag(num).Default(5)
 }
 
-func optionalFlag(num *int) {
+func optionalFlag(num *int, ctx *goat.Context) {
 	goat.Flag(num).Usage("This flag is optional!")
 
 	if num == nil {
-		fmt.Printf("No value provided.")
+		fmt.Fprintf(ctx.GetWriter(), "No value provided.")
+	} else {
+		fmt.Fprintln(ctx.GetWriter(), *num)
 	}
-	fmt.Println(num)
 }
 
 func Register() {
