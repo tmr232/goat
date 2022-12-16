@@ -162,6 +162,7 @@ func init() {
 		Action: func(c *cli.Context) error {
 			optionalFlag(
 				flags.GetFlag[*int](c, "num"),
+				goat.GetContext(c),
 			)
 			return nil
 		},

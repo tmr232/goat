@@ -3,10 +3,12 @@ package goat
 import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
+	"io"
 	"reflect"
 )
 
 type Context struct {
+	cliContext    *cli.Context
 	flagsByAction map[reflect.Value]map[string]any
 }
 
@@ -22,6 +24,10 @@ func (ctx *Context) GetFlag(f any, name string) (any, error) {
 	return flag, nil
 }
 
+func (ctx *Context) GetWriter() io.Writer {
+	return ctx.cliContext.App.Writer
+}
+
 func GetFlag[T any](ctx *Context, f any, name string) (T, error) {
 	anyVal, err := ctx.GetFlag(f, name)
 	if err != nil {
@@ -34,6 +40,9 @@ func GetFlag[T any](ctx *Context, f any, name string) (T, error) {
 func GetContext(c *cli.Context) *Context {
 	flagsByAction := make(map[reflect.Value]map[string]any)
 	for _, parentCtx := range c.Lineage()[1:] {
+		if parentCtx.App == nil {
+			break
+		}
 		funcValue, isRegistered := functionByCliActionFunc[reflect.ValueOf(parentCtx.App.Action)]
 		if !isRegistered {
 			break
@@ -42,5 +51,5 @@ func GetContext(c *cli.Context) *Context {
 		flagsByAction[funcValue] = ctxBuilder(c)
 	}
 
-	return &Context{flagsByAction: flagsByAction}
+	return &Context{flagsByAction: flagsByAction, cliContext: c}
 }
