@@ -25,5 +25,11 @@ jobs:
       - name: Generate
         run: go generate ./...
 
+      - name: Upload Generated Code
+        uses: actions/upload-artifact@v3
+        with:
+          name: Goater-Generated-${{ matrix.go-version }}
+          path: '**/*_goat.go'
+
       - name: Test
         run: go test ./...
