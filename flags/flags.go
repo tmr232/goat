@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"fmt"
 	"github.com/urfave/cli/v2"
 	"reflect"
 )
@@ -144,7 +145,11 @@ func init() {
 
 // MakeFlag creates a flag from a type and description values.
 func MakeFlag[T any](name string, usage string, defaultValue any) cli.Flag {
-	handler, exists := flagHandlers[reflect.TypeOf(*new(T))]
+	typeOf := reflect.TypeOf(*new(T))
+	for t, h := range flagHandlers {
+		fmt.Println(t.Name(), h)
+	}
+	handler, exists := flagHandlers[typeOf]
 	if !exists {
 		panic("Missing handler for type")
 	}

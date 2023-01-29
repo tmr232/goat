@@ -432,11 +432,76 @@ func isGoatContext(typeName string) bool {
 	return typeName == goatContextTypeName
 }
 
-func makeAction(functionName string, signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
+type ImportManager struct {
+	thisPkgPath   string
+	importsByPath map[string]string
+	importsByName map[string]string
+}
+
+func NewImportManager(thisPkgPath string) *ImportManager {
+	return &ImportManager{
+		thisPkgPath:   thisPkgPath,
+		importsByPath: make(map[string]string),
+		importsByName: make(map[string]string),
+	}
+}
+
+func (im *ImportManager) getImports() []string {
+	// TODO: Remove aliases where possible
+	var imports []string
+	for alias, path := range im.importsByName {
+		imports = append(imports, fmt.Sprintf("%s \"%s\"", alias, path))
+	}
+	return imports
+}
+
+func (im *ImportManager) addImport(name, path string) (alias string) {
+	// If we already have an alias for this path - we just return it
+	if alias, exists := im.importsByPath[path]; exists {
+		return alias
+	}
+	// If the desired name already exists - we create an alternate alias
+	if _, exists := im.importsByName[name]; exists {
+		suffix := 0
+		for {
+			alias := fmt.Sprintf("%s_%d", name, suffix)
+			if _, exists := im.importsByName[alias]; !exists {
+				return im.addImport(alias, path)
+			}
+		}
+	}
+	// If this is a new name and a new path - we add it
+	im.importsByName[name] = path
+	im.importsByPath[path] = name
+
+	return name
+}
+
+func (im *ImportManager) getTypeName(t types.Type) string {
+	switch t := t.(type) {
+	case *types.Named:
+		pkg := t.Obj().Pkg()
+		if pkg.Path() == im.thisPkgPath {
+			return t.Obj().Name()
+		}
+		alias := im.addImport(pkg.Name(), pkg.Path())
+		return alias + "." + t.Obj().Name()
+	case *types.Pointer:
+		return "*" + im.getTypeName(t.Elem())
+	case *types.Basic:
+		return t.Name()
+	default:
+		panic("WTF is this type???")
+	}
+}
+
+func makeAction(imports *ImportManager, functionName string, signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
 	flagByArgName := make(map[string]Flag)
 	for _, param := range getParams(signature.Func) {
+		name := imports.getTypeName(param.Type())
 		flagByArgName[param.Name()] = Flag{
-			Type:      param.Type().String(),
+			//Type:      param.Type().String(),
+			Type:      name,
 			Name:      fmt.Sprintf("\"%s\"", param.Name()),
 			Default:   "nil",
 			Usage:     "\"\"",
@@ -516,7 +581,7 @@ func (gh *Goatherd) getImports() ImportByName {
 	return importsByName
 }
 
-func (gh *Goatherd) createAction(actionFunc actionDefinition) (Action, error) {
+func (gh *Goatherd) createAction(imports *ImportManager, actionFunc actionDefinition) (Action, error) {
 	// The AST declaration is used in multiple places, so we get it here.
 	fdecl := gh.findFuncDecl(actionFunc.Func)
 	signature, err := gh.parseSignature(actionFunc.Func)
@@ -535,51 +600,61 @@ func (gh *Goatherd) createAction(actionFunc actionDefinition) (Action, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return makeAction(functionName, signature, actionDescription, flagDescriptions), nil
+	return makeAction(imports, functionName, signature, actionDescription, flagDescriptions), nil
 }
 
 func main() {
 	gh := NewGoatherd(loadPackages())
 	var actions []Action
-	usedImports := make(map[string]bool)
+	//usedImports := make(map[string]bool)
+	importManager := NewImportManager(gh.pkg.PkgPath)
+	for name, path := range map[string]string{
+		"goat":  "github.com/tmr232/goat",
+		"flags": "github.com/tmr232/goat/flags",
+		"cli":   "github.com/urfave/cli/v2",
+	} {
+		importManager.addImport(name, path)
+	}
 	for _, actionFuncDefinition := range gh.findActionFunctions() {
-		if selector, isSelector := actionFuncDefinition.Def.(*ast.SelectorExpr); isSelector {
-			usedImports[selector.X.(*ast.Ident).Name] = true
-
-		}
-		action, err := gh.createAction(actionFuncDefinition)
+		//if selector, isSelector := actionFuncDefinition.Def.(*ast.SelectorExpr); isSelector {
+		//	usedImports[selector.X.(*ast.Ident).Name] = true
+		//
+		//}
+		action, err := gh.createAction(importManager, actionFuncDefinition)
 		if err != nil {
 			log.Fatal(err)
 		}
 		actions = append(actions, action)
 	}
+	//
+	//importsByPath := make(map[string]*string)
+	//for name, spec := range gh.getImports() {
+	//	if !usedImports[name] {
+	//		continue
+	//	}
+	//	var alias *string
+	//	if spec.Name != nil {
+	//		alias = &spec.Name.Name
+	//	}
+	//	importsByPath[spec.Path.Value] = alias
+	//}
+	//
+	//baseImports := []string{
+	//	"\"github.com/tmr232/goat\"",
+	//	"\"github.com/tmr232/goat/flags\"",
+	//	"\"github.com/urfave/cli/v2\"",
+	//}
+	//
+	//imports := append([]string{}, baseImports...)
+	//for path, name := range importsByPath {
+	//	if name == nil {
+	//		imports = append(imports, path)
+	//	} else {
+	//		imports = append(imports, *name+" "+path)
+	//	}
+	//}
 
-	importsByPath := make(map[string]*string)
-	for name, spec := range gh.getImports() {
-		if !usedImports[name] {
-			continue
-		}
-		var alias *string
-		if spec.Name != nil {
-			alias = &spec.Name.Name
-		}
-		importsByPath[spec.Path.Value] = alias
-	}
-
-	baseImports := []string{
-		"\"github.com/tmr232/goat\"",
-		"\"github.com/tmr232/goat/flags\"",
-		"\"github.com/urfave/cli/v2\"",
-	}
-
-	imports := append([]string{}, baseImports...)
-	for path, name := range importsByPath {
-		if name == nil {
-			imports = append(imports, path)
-		} else {
-			imports = append(imports, *name+" "+path)
-		}
-	}
+	imports := importManager.getImports()
 
 	data := struct {
 		Package string

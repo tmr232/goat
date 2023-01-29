@@ -1,9 +1,9 @@
 package tests
 
 import (
-	"github.com/tmr232/goat"
-	"github.com/tmr232/goat/flags"
-	"github.com/urfave/cli/v2"
+	goat "github.com/tmr232/goat"
+	flags "github.com/tmr232/goat/flags"
+	cli "github.com/urfave/cli/v2"
 )
 
 func init() {
@@ -169,6 +169,25 @@ func init() {
 		CtxFlagBuilder: func(c *cli.Context) map[string]any {
 			cflags := make(map[string]any)
 			cflags["num"] = flags.GetFlag[*int](c, "num")
+			return cflags
+		},
+	})
+
+	goat.Register(withCustomType, goat.RunConfig{
+		Flags: []cli.Flag{
+			flags.MakeFlag[customType]("num", "", nil),
+		},
+		Name:  "withCustomType",
+		Usage: "",
+		Action: func(c *cli.Context) error {
+			withCustomType(
+				flags.GetFlag[customType](c, "num"),
+			)
+			return nil
+		},
+		CtxFlagBuilder: func(c *cli.Context) map[string]any {
+			cflags := make(map[string]any)
+			cflags["num"] = flags.GetFlag[customType](c, "num")
 			return cflags
 		},
 	})

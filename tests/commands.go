@@ -37,6 +37,10 @@ func optionalFlag(num *int, ctx *goat.Context) {
 	}
 }
 
+type customType int
+
+func withCustomType(num customType) {}
+
 func Register() {
 	goat.Command(noFlags)
 	goat.Command(intFlag)
@@ -45,4 +49,5 @@ func Register() {
 	goat.Command(flagUsage)
 	goat.Command(defaultValue)
 	goat.Command(optionalFlag)
+	goat.Command(withCustomType)
 }
