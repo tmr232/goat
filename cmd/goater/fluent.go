@@ -126,7 +126,6 @@ func parseActionDescription(fset *token.FileSet, chain FluentChain, reportError 
 
 type FlagDescription struct {
 	Id      string
-	Type    string
 	Name    *string
 	Usage   *string
 	Default *string
@@ -151,12 +150,8 @@ func parseFlagDescription(fset *token.FileSet, chain FluentChain, getType func(e
 	if err != nil {
 		return FlagDescription{}, errors.Wrap(err, "Could not format id node")
 	}
-	typ, err := getType(chain.Calls[0].Args[0])
-	if err != nil {
-		return FlagDescription{}, errors.Wrap(err, "Failed getting id type")
-	}
 
-	description := FlagDescription{Id: id, Type: typ}
+	description := FlagDescription{Id: id}
 
 	for _, call := range chain.Calls[1:] {
 		switch call.Name {

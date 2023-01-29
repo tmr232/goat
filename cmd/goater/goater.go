@@ -444,30 +444,20 @@ func makeAction(functionName string, signature GoatSignature, actionDescription 
 		}
 	}
 	for _, desc := range flagDescriptions {
-		typ := desc.Type
-		if isGoatContext(typ) {
-			// goat.Context is not a flag type, it's always the context object.
-			continue
-		}
-		name := "\"" + desc.Id + "\""
+
+		flag := flagByArgName[desc.Id]
+
 		if desc.Name != nil {
-			name = *desc.Name
+			flag.Name = *desc.Name
 		}
-		usage := "\"\""
 		if desc.Usage != nil {
-			usage = *desc.Usage
+			flag.Usage = *desc.Usage
 		}
-		default_ := "nil"
 		if desc.Default != nil {
-			default_ = *desc.Default
+			flag.Default = *desc.Default
 		}
-		flagByArgName[desc.Id] = Flag{
-			Type:      typ,
-			Name:      name,
-			Usage:     usage,
-			Default:   default_,
-			IsContext: false,
-		}
+
+		flagByArgName[desc.Id] = flag
 	}
 	var flags []Flag
 	for _, param := range getParams(signature.Func) {
