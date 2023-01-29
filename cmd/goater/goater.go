@@ -213,13 +213,53 @@ type GoatArg struct {
 	Type string
 }
 type GoatSignature struct {
-	Name    string
-	Args    []GoatArg
 	NoError bool
+	Func    *types.Func
+}
+
+func printTypeInfo(t types.Type) {
+	fmt.Println("================")
+	fmt.Println(t)
+	fmt.Println(reflect.TypeOf(t))
+	switch t := t.(type) {
+	case *types.Pointer:
+		printTypeInfo(t.Elem())
+	case *types.Named:
+		fmt.Println(t.Obj())
+		fmt.Println(t.Obj().Pkg(), t.Obj().Name())
+	}
+}
+
+func getParams(f *types.Func) []*types.Var {
+	params := f.Type().(*types.Signature).Params()
+	var result []*types.Var
+	for i := 0; i < params.Len(); i++ {
+		param := params.At(i)
+		result = append(result, param)
+	}
+	return result
+}
+
+func returnsError(f *types.Func) (bool, error) {
+	funcSignature := f.Type().(*types.Signature)
+
+	results := funcSignature.Results()
+	switch results.Len() {
+	case 0:
+		return true, nil
+	case 1:
+		result := results.At(0)
+		if result.Type().String() != "error" {
+			return false, errors.New("Action function result must be either error or nothing")
+		}
+		return false, nil
+	default:
+		return false, errors.New("Action function returns more than 1 value")
+	}
 }
 
 func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature, err error) {
-	signature.Name = f.Name()
+	signature.Func = f
 
 	funcSignature := f.Type().(*types.Signature)
 
@@ -237,12 +277,6 @@ func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature, err 
 		return GoatSignature{}, errors.New("Action function returns more than 1 value")
 	}
 
-	for i := 0; i < funcSignature.Params().Len(); i++ {
-		param := funcSignature.Params().At(i)
-		paramName := param.Name()
-		paramType := param.Type().String()
-		signature.Args = append(signature.Args, GoatArg{Name: paramName, Type: paramType})
-	}
 	return signature, nil
 }
 
@@ -400,13 +434,13 @@ func isGoatContext(typeName string) bool {
 
 func makeAction(functionName string, signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
 	flagByArgName := make(map[string]Flag)
-	for _, arg := range signature.Args {
-		flagByArgName[arg.Name] = Flag{
-			Type:      arg.Type,
-			Name:      "\"" + arg.Name + "\"",
+	for _, param := range getParams(signature.Func) {
+		flagByArgName[param.Name()] = Flag{
+			Type:      param.Type().String(),
+			Name:      fmt.Sprintf("\"%s\"", param.Name()),
 			Default:   "nil",
 			Usage:     "\"\"",
-			IsContext: isGoatContext(arg.Type),
+			IsContext: isGoatContext(param.Type().String()),
 		}
 	}
 	for _, desc := range flagDescriptions {
@@ -436,12 +470,12 @@ func makeAction(functionName string, signature GoatSignature, actionDescription 
 		}
 	}
 	var flags []Flag
-	for _, arg := range signature.Args {
-		flag := flagByArgName[arg.Name]
+	for _, param := range getParams(signature.Func) {
+		flag := flagByArgName[param.Name()]
 		flags = append(flags, flag)
 	}
 
-	name := "\"" + signature.Name + "\""
+	name := "\"" + signature.Func.Name() + "\""
 	if actionDescription.Name != nil {
 		name = *actionDescription.Name
 	}
