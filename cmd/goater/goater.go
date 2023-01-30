@@ -207,10 +207,6 @@ func findActionCalls(gh *Goatherd) []ast.Expr {
 	return callArgs
 }
 
-type GoatArg struct {
-	Name string
-	Type string
-}
 type GoatSignature struct {
 	NoError bool
 	Func    *types.Func
@@ -541,24 +537,6 @@ func (gh *Goatherd) getFuncDecl(f *types.Func) *ast.FuncDecl {
 		}
 	}
 	return nil
-}
-
-type ImportByName map[string]*ast.ImportSpec
-
-func (gh *Goatherd) getImports() ImportByName {
-	importsByName := make(ImportByName, 0)
-	for _, importSpec := range gh.pkg.Syntax[0].Imports {
-		var name string
-		if importSpec.Name != nil {
-			name = importSpec.Name.Name
-		} else {
-			p := gh.pkg.Imports[strings.Trim(importSpec.Path.Value, "\"")]
-			name = p.Name
-		}
-		importsByName[name] = importSpec
-	}
-
-	return importsByName
 }
 
 func (gh *Goatherd) createAction(imports *ImportManager, actionFunc actionDefinition) (Action, error) {
