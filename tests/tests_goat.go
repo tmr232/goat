@@ -15,10 +15,6 @@ func init() {
 			NoFlags()
 			return nil
 		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			return cflags
-		},
 	})
 
 	goat.Register(FlagsWithUsage, goat.RunConfig{
@@ -37,13 +33,6 @@ func init() {
 			)
 			return nil
 		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			cflags["a"] = flags.GetFlag[int](c, "a")
-			cflags["b"] = flags.GetFlag[int](c, "b")
-			cflags["c"] = flags.GetFlag[int](c, "c")
-			return cflags
-		},
 	})
 
 	goat.Register(noFlags, goat.RunConfig{
@@ -53,10 +42,6 @@ func init() {
 		Action: func(c *cli.Context) error {
 			noFlags()
 			return nil
-		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			return cflags
 		},
 	})
 
@@ -72,11 +57,6 @@ func init() {
 			)
 			return nil
 		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			cflags["flag"] = flags.GetFlag[int](c, "flag")
-			return cflags
-		},
 	})
 
 	goat.Register(renamedFlag, goat.RunConfig{
@@ -91,11 +71,6 @@ func init() {
 			)
 			return nil
 		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			cflags["flag"] = flags.GetFlag[int](c, "flag")
-			return cflags
-		},
 	})
 
 	goat.Register(Documented, goat.RunConfig{
@@ -105,10 +80,6 @@ func init() {
 		Action: func(c *cli.Context) error {
 			Documented()
 			return nil
-		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			return cflags
 		},
 	})
 
@@ -126,12 +97,6 @@ func init() {
 			)
 			return nil
 		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			cflags["num"] = flags.GetFlag[int](c, "num")
-			cflags["str"] = flags.GetFlag[string](c, "str")
-			return cflags
-		},
 	})
 
 	goat.Register(defaultValue, goat.RunConfig{
@@ -146,11 +111,6 @@ func init() {
 			)
 			return nil
 		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			cflags["num"] = flags.GetFlag[int](c, "num")
-			return cflags
-		},
 	})
 
 	goat.Register(optionalFlag, goat.RunConfig{
@@ -162,33 +122,8 @@ func init() {
 		Action: func(c *cli.Context) error {
 			optionalFlag(
 				flags.GetFlag[*int](c, "num"),
-				goat.GetContext(c),
 			)
 			return nil
-		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			cflags["num"] = flags.GetFlag[*int](c, "num")
-			return cflags
-		},
-	})
-
-	goat.Register(withCustomType, goat.RunConfig{
-		Flags: []cli.Flag{
-			flags.MakeFlag[customType]("num", "", nil),
-		},
-		Name:  "withCustomType",
-		Usage: "",
-		Action: func(c *cli.Context) error {
-			withCustomType(
-				flags.GetFlag[customType](c, "num"),
-			)
-			return nil
-		},
-		CtxFlagBuilder: func(c *cli.Context) map[string]any {
-			cflags := make(map[string]any)
-			cflags["num"] = flags.GetFlag[customType](c, "num")
-			return cflags
 		},
 	})
 }

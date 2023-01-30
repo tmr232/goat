@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/tmr232/goat"
 	"go/ast"
 	"go/format"
 	"go/types"
@@ -217,19 +216,6 @@ type GoatSignature struct {
 	Func    *types.Func
 }
 
-func printTypeInfo(t types.Type) {
-	fmt.Println("================")
-	fmt.Println(t)
-	fmt.Println(reflect.TypeOf(t))
-	switch t := t.(type) {
-	case *types.Pointer:
-		printTypeInfo(t.Elem())
-	case *types.Named:
-		fmt.Println(t.Obj())
-		fmt.Println(t.Obj().Pkg(), t.Obj().Name())
-	}
-}
-
 func getParams(f *types.Func) []*types.Var {
 	params := f.Type().(*types.Signature).Params()
 	var result []*types.Var
@@ -412,11 +398,10 @@ func formatSource(src string) string {
 }
 
 type Flag struct {
-	Type      string
-	Name      string
-	Usage     string
-	Default   string
-	IsContext bool
+	Type    string
+	Name    string
+	Usage   string
+	Default string
 }
 type Action struct {
 	Function string
@@ -424,12 +409,6 @@ type Action struct {
 	Name     string
 	Usage    string
 	NoError  bool
-}
-
-func isGoatContext(typeName string) bool {
-	goatContextType := reflect.TypeOf(*new(goat.Context))
-	goatContextTypeName := "*" + goatContextType.PkgPath() + "." + goatContextType.Name()
-	return typeName == goatContextTypeName
 }
 
 type ImportManager struct {
@@ -489,6 +468,9 @@ func (im *ImportManager) getTypeName(t types.Type) string {
 	case *types.Pointer:
 		return "*" + im.getTypeName(t.Elem())
 	case *types.Basic:
+		if t.Kind() == types.Invalid {
+			panic("Invalid type")
+		}
 		return t.Name()
 	default:
 		panic("WTF is this type???")
@@ -500,12 +482,10 @@ func makeAction(imports *ImportManager, functionName string, signature GoatSigna
 	for _, param := range getParams(signature.Func) {
 		name := imports.getTypeName(param.Type())
 		flagByArgName[param.Name()] = Flag{
-			//Type:      param.Type().String(),
-			Type:      name,
-			Name:      fmt.Sprintf("\"%s\"", param.Name()),
-			Default:   "nil",
-			Usage:     "\"\"",
-			IsContext: isGoatContext(param.Type().String()),
+			Type:    name,
+			Name:    fmt.Sprintf("\"%s\"", param.Name()),
+			Default: "nil",
+			Usage:   "\"\"",
 		}
 	}
 	for _, desc := range flagDescriptions {
@@ -606,7 +586,6 @@ func (gh *Goatherd) createAction(imports *ImportManager, actionFunc actionDefini
 func main() {
 	gh := NewGoatherd(loadPackages())
 	var actions []Action
-	//usedImports := make(map[string]bool)
 	importManager := NewImportManager(gh.pkg.PkgPath)
 	for name, path := range map[string]string{
 		"goat":  "github.com/tmr232/goat",
@@ -616,43 +595,12 @@ func main() {
 		importManager.addImport(name, path)
 	}
 	for _, actionFuncDefinition := range gh.findActionFunctions() {
-		//if selector, isSelector := actionFuncDefinition.Def.(*ast.SelectorExpr); isSelector {
-		//	usedImports[selector.X.(*ast.Ident).Name] = true
-		//
-		//}
 		action, err := gh.createAction(importManager, actionFuncDefinition)
 		if err != nil {
 			log.Fatal(err)
 		}
 		actions = append(actions, action)
 	}
-	//
-	//importsByPath := make(map[string]*string)
-	//for name, spec := range gh.getImports() {
-	//	if !usedImports[name] {
-	//		continue
-	//	}
-	//	var alias *string
-	//	if spec.Name != nil {
-	//		alias = &spec.Name.Name
-	//	}
-	//	importsByPath[spec.Path.Value] = alias
-	//}
-	//
-	//baseImports := []string{
-	//	"\"github.com/tmr232/goat\"",
-	//	"\"github.com/tmr232/goat/flags\"",
-	//	"\"github.com/urfave/cli/v2\"",
-	//}
-	//
-	//imports := append([]string{}, baseImports...)
-	//for path, name := range importsByPath {
-	//	if name == nil {
-	//		imports = append(imports, path)
-	//	} else {
-	//		imports = append(imports, *name+" "+path)
-	//	}
-	//}
 
 	imports := importManager.getImports()
 

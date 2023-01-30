@@ -68,6 +68,7 @@ func Test_apps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app := goat.FuncToApp(tt.args.f)
 			stdout := &bytes.Buffer{}
+			defer withWriter(stdout).restore()
 			app.Writer = stdout
 			_ = app.Run(tt.args.args)
 			approvals.Verify(t, stdout)

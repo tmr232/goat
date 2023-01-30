@@ -3,9 +3,26 @@ package tests
 import (
 	"fmt"
 	"github.com/tmr232/goat"
+	"io"
 )
 
 //go:generate go run github.com/tmr232/goat/cmd/goater
+
+var testCommandWriter io.Writer
+
+type writerContext struct {
+	io.Writer
+}
+
+func (c writerContext) restore() {
+	testCommandWriter = c
+}
+
+func withWriter(writer io.Writer) writerContext {
+	original := testCommandWriter
+	testCommandWriter = writer
+	return writerContext{original}
+}
 
 func noFlags()         {}
 func intFlag(flag int) {}
@@ -27,19 +44,15 @@ func defaultValue(num int) {
 	goat.Flag(num).Default(5)
 }
 
-func optionalFlag(num *int, ctx *goat.Context) {
+func optionalFlag(num *int) {
 	goat.Flag(num).Usage("This flag is optional!")
 
 	if num == nil {
-		fmt.Fprintf(ctx.GetWriter(), "No value provided.")
+		fmt.Fprintln(testCommandWriter, "No value provided.")
 	} else {
-		fmt.Fprintln(ctx.GetWriter(), *num)
+		fmt.Fprintln(testCommandWriter, *num)
 	}
 }
-
-type customType int
-
-func withCustomType(num customType) {}
 
 func Register() {
 	goat.Command(noFlags)
@@ -49,5 +62,4 @@ func Register() {
 	goat.Command(flagUsage)
 	goat.Command(defaultValue)
 	goat.Command(optionalFlag)
-	goat.Command(withCustomType)
 }

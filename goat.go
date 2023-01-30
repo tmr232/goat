@@ -19,20 +19,17 @@ type RunConfig struct {
 }
 
 var runConfigByFunction map[reflect.Value]RunConfig
-var functionByCliActionFunc map[reflect.Value]reflect.Value
 
 func init() {
 	runConfigByFunction = make(map[reflect.Value]RunConfig)
-	functionByCliActionFunc = make(map[reflect.Value]reflect.Value)
 }
 
 // Register registers a RunConfig generated from a function.
 //
 // This is only used in generated code.
-func Register(app any, config RunConfig) {
+func Register(app any, makeConfig RunConfig) {
 	appValue := reflect.ValueOf(app)
-	runConfigByFunction[appValue] = config
-	functionByCliActionFunc[reflect.ValueOf(config.Action)] = appValue
+	runConfigByFunction[appValue] = makeConfig
 }
 
 func RunWithArgsE(f any, args []string) error {
