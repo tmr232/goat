@@ -1,15 +1,19 @@
 package main
 
 import (
+	"fmt"
 	"github.com/tmr232/goat"
 	"github.com/tmr232/goat/flags"
 	"github.com/urfave/cli/v2"
 	"go/types"
 )
 
+//go:generate go run github.com/tmr232/goat/cmd/goater
 type customType int
 
-func withCustomType(num customType, x int, t types.Type) {}
+func withCustomType(num customType, x int, t types.Type) {
+	fmt.Println(num)
+}
 
 type customTypeHandler struct {
 	make func(name, usage string, defaultValue any) cli.Flag
@@ -41,7 +45,7 @@ func init() {
 			}
 		},
 		get: func(c *cli.Context, name string) any {
-			return c.Int(name)
+			return customType(c.Int(name))
 		},
 	})
 	flags.RegisterTypeHandler[types.Type](&customTypeHandler{

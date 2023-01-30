@@ -20,22 +20,24 @@
 
 
 {{define "register-function"}}
-    goat.Register({{.Function}}, goat.RunConfig{
-    Flags: []cli.Flag{
-    {{- range .Flags}}
-        flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}),
-    {{- end}}
-    },
-    Name: {{.Name}},
-    Usage: {{.Usage}},
-    Action: func(c *cli.Context) error {
-    {{- if .NoError }}
-        {{- template "function-call" . }}
-        return nil
-    {{- else}}
-        return {{ template "function-call" . -}}
-    {{- end}}
-    },
+    goat.Register({{.Function}}, func() goat.RunConfig {
+        return goat.RunConfig{
+            Flags: []cli.Flag{
+            {{- range .Flags}}
+                flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}),
+            {{- end}}
+            },
+            Name: {{.Name}},
+            Usage: {{.Usage}},
+            Action: func(c *cli.Context) error {
+            {{- if .NoError }}
+                {{- template "function-call" . }}
+                return nil
+            {{- else}}
+                return {{ template "function-call" . -}}
+            {{- end}}
+            },
+        }
     })
 {{end}}
 
