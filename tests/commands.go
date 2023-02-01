@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/tmr232/goat"
 	"io"
+	"reflect"
 )
 
 //go:generate go run github.com/tmr232/goat/cmd/goater
@@ -22,6 +23,22 @@ func withWriter(writer io.Writer) writerContext {
 	original := testCommandWriter
 	testCommandWriter = writer
 	return writerContext{original}
+}
+
+func printArg(name string, value any) {
+	if reflect.TypeOf(value).Kind() != reflect.Pointer || reflect.ValueOf(value).IsNil() {
+		fmt.Fprintf(testCommandWriter, "%s = %#v\n", name, value)
+	} else {
+		fmt.Fprintf(testCommandWriter, "%s = *-> %#v\n", name, reflect.ValueOf(value).Elem().Interface())
+	}
+}
+
+func withIntFlags(required, defaultValue int, optional *int) {
+	goat.Flag(defaultValue).Default(42)
+
+	printArg("required", required)
+	printArg("defaultValue", defaultValue)
+	printArg("optional", optional)
 }
 
 func noFlags()         {}
@@ -62,4 +79,5 @@ func Register() {
 	goat.Command(flagUsage)
 	goat.Command(defaultValue)
 	goat.Command(optionalFlag)
+	goat.Command(withIntFlags)
 }

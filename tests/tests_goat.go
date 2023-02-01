@@ -144,4 +144,24 @@ func init() {
 			},
 		}
 	})
+
+	goat.Register(withIntFlags, func() goat.RunConfig {
+		return goat.RunConfig{
+			Flags: []cli.Flag{
+				flags.MakeFlag[int]("required", "", nil),
+				flags.MakeFlag[int]("defaultValue", "", 42),
+				flags.MakeFlag[*int]("optional", "", nil),
+			},
+			Name:  "withIntFlags",
+			Usage: "",
+			Action: func(c *cli.Context) error {
+				withIntFlags(
+					flags.GetFlag[int](c, "required"),
+					flags.GetFlag[int](c, "defaultValue"),
+					flags.GetFlag[*int](c, "optional"),
+				)
+				return nil
+			},
+		}
+	})
 }

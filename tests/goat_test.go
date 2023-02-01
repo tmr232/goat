@@ -63,6 +63,10 @@ func Test_apps(t *testing.T) {
 		{"optionalFlag --help", args{optionalFlag, Args("--help")}},
 		{"optionalFlag", args{optionalFlag, Args()}},
 		{"optionalFlag --num 10", args{optionalFlag, Args("--num", "10")}},
+		{"withIntFlags", args{withIntFlags, Args()}},
+		{"withIntFlags --required 1", args{withIntFlags, Args("--required", "1")}},
+		{"withIntFlags --required 1 --optional 2", args{withIntFlags, Args("--required", "1", "--optional", "2")}},
+		{"withIntFlags --required 1 --optional 2 --defaultValue 3", args{withIntFlags, Args("--required", "1", "--optional", "2", "--defaultValue", "3")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
