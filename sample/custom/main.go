@@ -110,10 +110,6 @@ func init() {
 	})
 }
 
-func f() {
-	goat.Command(withCustomType)
-}
-
 func main() {
 	goat.Run(withHex)
 	//goat.Run(withCustomType)

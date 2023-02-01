@@ -524,21 +524,6 @@ func makeAction(imports *ImportManager, functionName string, signature GoatSigna
 	}
 }
 
-func (gh *Goatherd) getFuncDecl(f *types.Func) *ast.FuncDecl {
-	for _, file := range gh.pkg.Syntax {
-		for _, decl := range file.Decls {
-			funcDecl, isFuncDecl := decl.(*ast.FuncDecl)
-			if !isFuncDecl {
-				continue
-			}
-			if gh.pkg.TypesInfo.Defs[funcDecl.Name] == f {
-				return funcDecl
-			}
-		}
-	}
-	return nil
-}
-
 func (gh *Goatherd) createAction(imports *ImportManager, actionFunc actionDefinition) (Action, error) {
 	// The AST declaration is used in multiple places, so we get it here.
 	fdecl := gh.findFuncDecl(actionFunc.Func)
