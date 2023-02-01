@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/approvals/go-approval-tests"
 	"github.com/tmr232/goat"
+	"os"
 	"strings"
 	"testing"
 )
@@ -128,4 +129,9 @@ func TestApp(t *testing.T) {
 			approvals.Verify(t, stdout)
 		})
 	}
+}
+
+func TestMain(m *testing.M) {
+	approvals.UseFolder("testdata")
+	os.Exit(m.Run())
 }
