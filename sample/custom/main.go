@@ -33,6 +33,7 @@ func (h *customTypeHandler) GetFlag(c *cli.Context, name string) any {
 }
 
 type hexNumber uint64
+type mockHex uint64
 
 func (h *hexNumber) Set(value string) error {
 	num, err := strconv.ParseUint(strings.TrimPrefix(strings.ToLower(value), "0x"), 16, 32)
@@ -49,7 +50,7 @@ func (h *hexNumber) FromString(value string) (any, error) {
 	return hexNumber(num), err
 }
 
-func withHex(hex hexNumber, phex *hexNumber) {
+func withHex(hex mockHex, phex *hexNumber) {
 	goat.Flag(hex).Default(hexNumber(0x12))
 	fmt.Println(hex, phex)
 }
@@ -85,6 +86,38 @@ func (m *MyGeneric[T]) Set(value string) error {
 
 func (m *MyGeneric[T]) String() string {
 	return m.toString(&m.val)
+}
+
+func registerGenAs[T any, As any]() {
+	genericType := reflect.TypeOf(*new(As))
+
+	flags.RegisterTypeHandler[T](&customTypeHandler{
+		make: func(name, usage string, defaultValue any) cli.Flag {
+			genericValue := reflect.New(genericType)
+			genericInterface := genericValue
+
+			if defaultValue == nil {
+				return &cli.GenericFlag{
+					Name:     name,
+					Usage:    usage,
+					Value:    genericInterface.Interface().(cli.Generic),
+					Required: true,
+				}
+			}
+
+			genericInterface = reflect.New(genericType)
+			genericInterface.Elem().Set(reflect.ValueOf(defaultValue).Convert(genericType))
+
+			return &cli.GenericFlag{
+				Name:  name,
+				Usage: usage,
+				Value: genericInterface.Interface().(cli.Generic),
+			}
+		},
+		get: func(c *cli.Context, name string) any {
+			return reflect.ValueOf(c.Generic(name)).Elem().Convert(reflect.TypeOf(*new(T))).Interface()
+		},
+	})
 }
 
 func registerGen[T any]() {
@@ -216,6 +249,7 @@ func registerCustom[As any, T Custom]() {
 func init() {
 	// registerCustom[hexNumber, *hexNumber]()
 	registerGen[hexNumber]()
+	registerGenAs[mockHex, hexNumber]()
 	registerGenOpt[hexNumber]()
 	//registerGeneric[hexNumber](
 	//	func(t *hexNumber) string {
