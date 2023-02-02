@@ -11,4 +11,4 @@ USAGE:
 
 OPTIONS:
    --flag value  (default: 0)
-   --help, -h    show help (default: false)
+   --help, -h    show help

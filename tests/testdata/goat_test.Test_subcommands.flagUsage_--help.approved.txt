@@ -5,9 +5,9 @@ NAME:
    test-app flagUsage
 
 USAGE:
-   test-app flagUsage [command options] [arguments...]
+   test-app flagUsage command [command options] [arguments...]
 
 OPTIONS:
    --num value  A number of things. (default: 0)
    --str value  A piece of text.
-   --help, -h   show help (default: false)
+   --help, -h   show help

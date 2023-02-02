@@ -4,10 +4,7 @@ NAME:
                 It's just so nice to document your code.
 
 USAGE:
-   Documented [global options] command [command options] [arguments...]
-
-COMMANDS:
-   help, h  Shows a list of commands or help for one command
+   Documented [global options] [arguments...]
 
 GLOBAL OPTIONS:
-   --help, -h  show help (default: false)
+   --help, -h  show help

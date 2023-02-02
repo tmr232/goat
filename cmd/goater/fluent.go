@@ -2,10 +2,11 @@ package main
 
 import (
 	"bytes"
-	"github.com/pkg/errors"
 	"go/ast"
 	"go/format"
 	"go/token"
+
+	"github.com/pkg/errors"
 )
 
 type FluentCall struct {
@@ -58,7 +59,6 @@ func parseFluentChain(call *ast.CallExpr) (FluentChain, bool) {
 		Base:  base,
 		Calls: Reversed(calls),
 	}, true
-
 }
 
 type ActionDescription struct {

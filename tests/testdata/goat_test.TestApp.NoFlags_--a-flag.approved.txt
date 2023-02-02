@@ -10,4 +10,4 @@ USAGE:
    test-app NoFlags [command options] [arguments...]
 
 OPTIONS:
-   --help, -h  show help (default: false)
+   --help, -h  show help

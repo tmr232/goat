@@ -1,8 +1,9 @@
 package flags
 
 import (
-	"github.com/urfave/cli/v2"
 	"reflect"
+
+	"github.com/urfave/cli/v2"
 )
 
 func tryCast[T any](from any) T {

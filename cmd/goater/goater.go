@@ -4,16 +4,18 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/pkg/errors"
 	"go/ast"
 	"go/format"
 	"go/types"
-	"golang.org/x/tools/go/packages"
 	"log"
 	"os"
 	"reflect"
 	"strings"
 	"text/template"
+
+	"github.com/pkg/errors"
+
+	"golang.org/x/tools/go/packages"
 )
 
 func loadPackages() *packages.Package {
@@ -79,6 +81,7 @@ func (gh *Goatherd) isGoatRun(node *ast.CallExpr) bool {
 	return gh.isCallTo(node, "github.com/tmr232/goat", "RunE") ||
 		gh.isCallTo(node, "github.com/tmr232/goat", "Run")
 }
+
 func (gh *Goatherd) isGoatCommand(node *ast.CallExpr) bool {
 	if len(node.Args) < 1 {
 		return false
@@ -267,6 +270,7 @@ var notAFlagDescription = errors.New("Not a flag description")
 func (gh *Goatherd) reportError(node ast.Node, message string) {
 	fmt.Println(gh.pkg.Fset.Position(node.Pos()), "Error:", message)
 }
+
 func (gh *Goatherd) parseActionDescription(fdecl *ast.FuncDecl) (ActionDescription, error) {
 	var description ActionDescription
 	var err error
@@ -297,7 +301,6 @@ func (gh *Goatherd) parseActionDescription(fdecl *ast.FuncDecl) (ActionDescripti
 		description.Usage = &text
 	}
 	return description, nil
-
 }
 
 func (gh *Goatherd) parseFlagDescriptions(fdecl *ast.FuncDecl) ([]FlagDescription, error) {
@@ -328,8 +331,8 @@ func (gh *Goatherd) parseFlagDescriptions(fdecl *ast.FuncDecl) ([]FlagDescriptio
 		return nil, errors.New("Encountered errors!")
 	}
 	return descriptions, nil
-
 }
+
 func (gh *Goatherd) parseFlagDescription(callExpr *ast.CallExpr) (FlagDescription, error) {
 	chain, isChain := parseFluentChain(callExpr)
 	if !isChain || !isFlagDescription(chain) {
@@ -581,7 +584,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = os.WriteFile(gh.pkg.Name+"_goat.go", []byte(formatSource(file)), 0644)
+	err = os.WriteFile(gh.pkg.Name+"_goat.go", []byte(formatSource(file)), 0o644)
 	if err != nil {
 		log.Fatalf("writing output: %s", err)
 	}

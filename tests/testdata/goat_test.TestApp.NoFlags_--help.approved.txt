@@ -5,7 +5,7 @@ NAME:
    test-app NoFlags - has no flags.
 
 USAGE:
-   test-app NoFlags [command options] [arguments...]
+   test-app NoFlags command [command options] [arguments...]
 
 OPTIONS:
-   --help, -h  show help (default: false)
+   --help, -h  show help

@@ -5,10 +5,10 @@ NAME:
    test-app FlagsWithUsage - has usage for its flags!
 
 USAGE:
-   test-app FlagsWithUsage [command options] [arguments...]
+   test-app FlagsWithUsage command [command options] [arguments...]
 
 OPTIONS:
    -a value    This is a (default: 0)
    -b value    Nice! (default: 0)
    -c value    C. (default: 0)
-   --help, -h  show help (default: false)
+   --help, -h  show help

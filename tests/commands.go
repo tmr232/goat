@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+
 	"github.com/tmr232/goat"
 )
 

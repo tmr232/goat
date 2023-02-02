@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/tmr232/goat"
 	"io"
+
+	"github.com/tmr232/goat"
 )
 
 // NoFlags has no flags.

@@ -27,8 +27,10 @@ func (h *customTypeHandler) GetFlag(c *cli.Context, name string) any {
 	return h.get(c, name)
 }
 
-type hexNumber uint64
-type mockHex uint64
+type (
+	hexNumber uint64
+	mockHex   uint64
+)
 
 func (h *hexNumber) Set(value string) error {
 	num, err := strconv.ParseUint(strings.TrimPrefix(strings.ToLower(value), "0x"), 16, 32)

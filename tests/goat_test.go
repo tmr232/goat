@@ -2,11 +2,12 @@ package tests
 
 import (
 	"bytes"
-	"github.com/approvals/go-approval-tests"
-	"github.com/tmr232/goat"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/approvals/go-approval-tests"
+	"github.com/tmr232/goat"
 )
 
 func Args(args ...string) []string {

@@ -1,10 +1,11 @@
 package goat
 
 import (
-	"github.com/urfave/cli/v2"
 	"log"
 	"os"
 	"reflect"
+
+	"github.com/urfave/cli/v2"
 )
 
 type RunConfig struct {
@@ -40,10 +41,11 @@ func RunWithArgsE(f any, args []string) error {
 	config := getRunConfigForFunction(f)
 
 	app := &cli.App{
-		Flags:  config.Flags,
-		Action: config.Action,
-		Name:   config.Name,
-		Usage:  config.Usage,
+		Flags:           config.Flags,
+		Action:          config.Action,
+		Name:            config.Name,
+		Usage:           config.Usage,
+		HideHelpCommand: true,
 	}
 
 	return app.Run(args)
@@ -53,10 +55,11 @@ func FuncToApp(f any) *cli.App {
 	config := getRunConfigForFunction(f)
 
 	app := &cli.App{
-		Flags:  config.Flags,
-		Action: config.Action,
-		Name:   config.Name,
-		Usage:  config.Usage,
+		Flags:           config.Flags,
+		Action:          config.Action,
+		Name:            config.Name,
+		Usage:           config.Usage,
+		HideHelpCommand: true,
 	}
 	return app
 }
@@ -100,6 +103,9 @@ func (g *GoatGroup) Usage(usage string) *GoatGroup {
 }
 
 func PartsToCommands(parts []AppPart) []*cli.Command {
+	if len(parts) == 0 {
+		return nil
+	}
 	commands := make([]*cli.Command, len(parts))
 	for i, part := range parts {
 		commands[i] = part.cliCommand()
@@ -111,18 +117,20 @@ func Command(f any, subcommands ...AppPart) *GoatCommand {
 	config := getRunConfigForFunction(f)
 
 	return &GoatCommand{&cli.Command{
-		Flags:       config.Flags,
-		Action:      config.Action,
-		Name:        config.Name,
-		Usage:       config.Usage,
-		Subcommands: PartsToCommands(subcommands),
+		Flags:           config.Flags,
+		Action:          config.Action,
+		Name:            config.Name,
+		Usage:           config.Usage,
+		Subcommands:     PartsToCommands(subcommands),
+		HideHelpCommand: true,
 	}}
 }
 
 func Group(name string, subcommands ...AppPart) *GoatGroup {
 	return &GoatGroup{&cli.Command{
-		Name:        name,
-		Subcommands: PartsToCommands(subcommands),
+		Name:            name,
+		Subcommands:     PartsToCommands(subcommands),
+		HideHelpCommand: true,
 	}}
 }
 
@@ -135,17 +143,20 @@ func (app Application) RunWithArgsE(args []string) error {
 func (app Application) RunE() error {
 	return app.App.Run(os.Args)
 }
+
 func (app Application) Run() {
 	err := app.App.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
+
 func App(name string, commands ...AppPart) Application {
 	return Application{
 		App: &cli.App{
-			Name:     name,
-			Commands: PartsToCommands(commands),
+			Name:            name,
+			Commands:        PartsToCommands(commands),
+			HideHelpCommand: true,
 		},
 	}
 }

@@ -1,14 +1,11 @@
-Incorrect Usage. invalid value "a" for flag -flag: parse error
+Incorrect Usage: invalid value "a" for flag -flag: parse error
 
 NAME:
    intFlag - A new cli application
 
 USAGE:
-   intFlag [global options] command [command options] [arguments...]
-
-COMMANDS:
-   help, h  Shows a list of commands or help for one command
+   intFlag [global options] [arguments...]
 
 GLOBAL OPTIONS:
    --flag value  (default: 0)
-   --help, -h    show help (default: false)
+   --help, -h    show help
