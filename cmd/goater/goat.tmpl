@@ -20,44 +20,31 @@
 
 
 {{define "register-function"}}
-    goat.Register({{.Function}}, goat.RunConfig{
-    Flags: []cli.Flag{
-    {{- range .Flags}}
-        {{- if not .IsContext}}
-            flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}),
-        {{- end}}
-    {{- end}}
-    },
-    Name: {{.Name}},
-    Usage: {{.Usage}},
-    Action: func(c *cli.Context) error {
-    {{- if .NoError }}
-        {{- template "function-call" . }}
-        return nil
-    {{- else}}
-        return {{ template "function-call" . -}}
-    {{- end}}
-    },
-    CtxFlagBuilder: func(c *cli.Context) map[string]any {
-    cflags := make(map[string]any)
-    {{- range .Flags}}
-        {{- if not .IsContext}}
-            cflags[{{.Name}}] = flags.GetFlag[{{.Type}}](c, {{.Name}})
-        {{- end}}
-    {{- end}}
-    return cflags
-    },
+    goat.Register({{.Function}}, func() goat.RunConfig {
+        return goat.RunConfig{
+            Flags: []cli.Flag{
+            {{- range .Flags}}
+                flags.MakeFlag[{{.Type}}]({{.Name}}, {{.Usage}}, {{.Default}}),
+            {{- end}}
+            },
+            Name: {{.Name}},
+            Usage: {{.Usage}},
+            Action: func(c *cli.Context) error {
+            {{- if .NoError }}
+                {{- template "function-call" . }}
+                return nil
+            {{- else}}
+                return {{ template "function-call" . -}}
+            {{- end}}
+            },
+        }
     })
 {{end}}
 
 {{- define "function-call" -}}
     {{.Function}}(
     {{- range .Flags}}
-        {{-  if .IsContext }}
-            goat.GetContext(c),
-        {{- else}}
-            flags.GetFlag[{{.Type}}](c, {{.Name}}),
-        {{- end}}
+        flags.GetFlag[{{.Type}}](c, {{.Name}}),
     {{- end}}
     )
 {{- end}}

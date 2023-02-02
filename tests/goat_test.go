@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/approvals/go-approval-tests"
 	"github.com/tmr232/goat"
+	"os"
 	"strings"
 	"testing"
 )
@@ -63,11 +64,16 @@ func Test_apps(t *testing.T) {
 		{"optionalFlag --help", args{optionalFlag, Args("--help")}},
 		{"optionalFlag", args{optionalFlag, Args()}},
 		{"optionalFlag --num 10", args{optionalFlag, Args("--num", "10")}},
+		{"withIntFlags", args{withIntFlags, Args()}},
+		{"withIntFlags --required 1", args{withIntFlags, Args("--required", "1")}},
+		{"withIntFlags --required 1 --optional 2", args{withIntFlags, Args("--required", "1", "--optional", "2")}},
+		{"withIntFlags --required 1 --optional 2 --defaultValue 3", args{withIntFlags, Args("--required", "1", "--optional", "2", "--defaultValue", "3")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := goat.FuncToApp(tt.args.f)
 			stdout := &bytes.Buffer{}
+			defer withWriter(stdout).restore()
 			app.Writer = stdout
 			_ = app.Run(tt.args.args)
 			approvals.Verify(t, stdout)
@@ -123,4 +129,9 @@ func TestApp(t *testing.T) {
 			approvals.Verify(t, stdout)
 		})
 	}
+}
+
+func TestMain(m *testing.M) {
+	approvals.UseFolder("testdata")
+	os.Exit(m.Run())
 }

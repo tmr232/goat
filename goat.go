@@ -18,25 +18,26 @@ type RunConfig struct {
 	Usage          string
 }
 
-var runConfigByFunction map[reflect.Value]RunConfig
-var functionByCliActionFunc map[reflect.Value]reflect.Value
+var runConfigByFunction map[reflect.Value]func() RunConfig
 
 func init() {
-	runConfigByFunction = make(map[reflect.Value]RunConfig)
-	functionByCliActionFunc = make(map[reflect.Value]reflect.Value)
+	runConfigByFunction = make(map[reflect.Value]func() RunConfig)
 }
 
 // Register registers a RunConfig generated from a function.
 //
 // This is only used in generated code.
-func Register(app any, config RunConfig) {
+func Register(app any, makeConfig func() RunConfig) {
 	appValue := reflect.ValueOf(app)
-	runConfigByFunction[appValue] = config
-	functionByCliActionFunc[reflect.ValueOf(config.Action)] = appValue
+	runConfigByFunction[appValue] = makeConfig
+}
+
+func getRunConfigForFunction(f any) RunConfig {
+	return runConfigByFunction[reflect.ValueOf(f)]()
 }
 
 func RunWithArgsE(f any, args []string) error {
-	config := runConfigByFunction[reflect.ValueOf(f)]
+	config := getRunConfigForFunction(f)
 
 	app := &cli.App{
 		Flags:  config.Flags,
@@ -49,7 +50,7 @@ func RunWithArgsE(f any, args []string) error {
 }
 
 func FuncToApp(f any) *cli.App {
-	config := runConfigByFunction[reflect.ValueOf(f)]
+	config := getRunConfigForFunction(f)
 
 	app := &cli.App{
 		Flags:  config.Flags,
@@ -107,7 +108,7 @@ func PartsToCommands(parts []AppPart) []*cli.Command {
 }
 
 func Command(f any, subcommands ...AppPart) *GoatCommand {
-	config := runConfigByFunction[reflect.ValueOf(f)]
+	config := getRunConfigForFunction(f)
 
 	return &GoatCommand{&cli.Command{
 		Flags:       config.Flags,
