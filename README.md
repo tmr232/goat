@@ -182,10 +182,5 @@ In the future, I plan to write backends for other popular flag-parsing libraries
 (namely [Cobra](https://cobra.dev/) and [flag](https://pkg.go.dev/flag)) so that
 users can choose what they depend on.
 
----
-
-### Internals
-
-See [this blog post](https://blog.tamir.dev/posts/goat-codegen-initial/) for more implementation details.
 
 [Typer]:https://typer.tiangolo.com/
