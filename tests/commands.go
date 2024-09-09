@@ -2,10 +2,19 @@ package tests
 
 import (
 	"fmt"
+
 	"github.com/tmr232/goat"
 )
 
 //go:generate go run github.com/tmr232/goat/cmd/goater
+
+func withIntFlags(required, defaultValue int, optional *int) {
+	goat.Flag(defaultValue).Default(42)
+
+	printArg("required", required)
+	printArg("defaultValue", defaultValue)
+	printArg("optional", optional)
+}
 
 func noFlags()         {}
 func intFlag(flag int) {}
@@ -27,13 +36,13 @@ func defaultValue(num int) {
 	goat.Flag(num).Default(5)
 }
 
-func optionalFlag(num *int, ctx *goat.Context) {
+func optionalFlag(num *int) {
 	goat.Flag(num).Usage("This flag is optional!")
 
 	if num == nil {
-		fmt.Fprintf(ctx.GetWriter(), "No value provided.")
+		fmt.Fprintln(testCommandWriter, "No value provided.")
 	} else {
-		fmt.Fprintln(ctx.GetWriter(), *num)
+		fmt.Fprintln(testCommandWriter, *num)
 	}
 }
 
@@ -45,4 +54,5 @@ func Register() {
 	goat.Command(flagUsage)
 	goat.Command(defaultValue)
 	goat.Command(optionalFlag)
+	goat.Command(withIntFlags)
 }

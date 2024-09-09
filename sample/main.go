@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/tmr232/goat"
 )

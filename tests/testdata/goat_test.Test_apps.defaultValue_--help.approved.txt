@@ -1,0 +1,9 @@
+NAME:
+   defaultValue - A new cli application
+
+USAGE:
+   defaultValue [global options] [arguments...]
+
+GLOBAL OPTIONS:
+   --num value  (default: 5)
+   --help, -h   show help

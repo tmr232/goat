@@ -1,0 +1,3 @@
+required = 1
+defaultValue = 42
+optional = (*int)(nil)

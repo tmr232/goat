@@ -1,0 +1,9 @@
+NAME:
+   optionalFlag - A new cli application
+
+USAGE:
+   optionalFlag [global options] [arguments...]
+
+GLOBAL OPTIONS:
+   --num value  This flag is optional! (default: 0)
+   --help, -h   show help

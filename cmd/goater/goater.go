@@ -4,17 +4,18 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/tmr232/goat"
 	"go/ast"
 	"go/format"
 	"go/types"
-	"golang.org/x/tools/go/packages"
 	"log"
 	"os"
 	"reflect"
 	"strings"
 	"text/template"
+
+	"github.com/pkg/errors"
+
+	"golang.org/x/tools/go/packages"
 )
 
 func loadPackages() *packages.Package {
@@ -80,6 +81,7 @@ func (gh *Goatherd) isGoatRun(node *ast.CallExpr) bool {
 	return gh.isCallTo(node, "github.com/tmr232/goat", "RunE") ||
 		gh.isCallTo(node, "github.com/tmr232/goat", "Run")
 }
+
 func (gh *Goatherd) isGoatCommand(node *ast.CallExpr) bool {
 	if len(node.Args) < 1 {
 		return false
@@ -208,18 +210,41 @@ func findActionCalls(gh *Goatherd) []ast.Expr {
 	return callArgs
 }
 
-type GoatArg struct {
-	Name string
-	Type string
-}
 type GoatSignature struct {
-	Name    string
-	Args    []GoatArg
 	NoError bool
+	Func    *types.Func
+}
+
+func getParams(f *types.Func) []*types.Var {
+	params := f.Type().(*types.Signature).Params()
+	var result []*types.Var
+	for i := 0; i < params.Len(); i++ {
+		param := params.At(i)
+		result = append(result, param)
+	}
+	return result
+}
+
+func returnsError(f *types.Func) (bool, error) {
+	funcSignature := f.Type().(*types.Signature)
+
+	results := funcSignature.Results()
+	switch results.Len() {
+	case 0:
+		return true, nil
+	case 1:
+		result := results.At(0)
+		if result.Type().String() != "error" {
+			return false, errors.New("Action function result must be either error or nothing")
+		}
+		return false, nil
+	default:
+		return false, errors.New("Action function returns more than 1 value")
+	}
 }
 
 func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature, err error) {
-	signature.Name = f.Name()
+	signature.Func = f
 
 	funcSignature := f.Type().(*types.Signature)
 
@@ -237,12 +262,6 @@ func (gh *Goatherd) parseSignature(f *types.Func) (signature GoatSignature, err 
 		return GoatSignature{}, errors.New("Action function returns more than 1 value")
 	}
 
-	for i := 0; i < funcSignature.Params().Len(); i++ {
-		param := funcSignature.Params().At(i)
-		paramName := param.Name()
-		paramType := param.Type().String()
-		signature.Args = append(signature.Args, GoatArg{Name: paramName, Type: paramType})
-	}
 	return signature, nil
 }
 
@@ -251,6 +270,7 @@ var notAFlagDescription = errors.New("Not a flag description")
 func (gh *Goatherd) reportError(node ast.Node, message string) {
 	fmt.Println(gh.pkg.Fset.Position(node.Pos()), "Error:", message)
 }
+
 func (gh *Goatherd) parseActionDescription(fdecl *ast.FuncDecl) (ActionDescription, error) {
 	var description ActionDescription
 	var err error
@@ -281,7 +301,6 @@ func (gh *Goatherd) parseActionDescription(fdecl *ast.FuncDecl) (ActionDescripti
 		description.Usage = &text
 	}
 	return description, nil
-
 }
 
 func (gh *Goatherd) parseFlagDescriptions(fdecl *ast.FuncDecl) ([]FlagDescription, error) {
@@ -312,8 +331,8 @@ func (gh *Goatherd) parseFlagDescriptions(fdecl *ast.FuncDecl) ([]FlagDescriptio
 		return nil, errors.New("Encountered errors!")
 	}
 	return descriptions, nil
-
 }
+
 func (gh *Goatherd) parseFlagDescription(callExpr *ast.CallExpr) (FlagDescription, error) {
 	chain, isChain := parseFluentChain(callExpr)
 	if !isChain || !isFlagDescription(chain) {
@@ -378,11 +397,10 @@ func formatSource(src string) string {
 }
 
 type Flag struct {
-	Type      string
-	Name      string
-	Usage     string
-	Default   string
-	IsContext bool
+	Type    string
+	Name    string
+	Usage   string
+	Default string
 }
 type Action struct {
 	Function string
@@ -392,56 +410,106 @@ type Action struct {
 	NoError  bool
 }
 
-func isGoatContext(typeName string) bool {
-	goatContextType := reflect.TypeOf(*new(goat.Context))
-	goatContextTypeName := "*" + goatContextType.PkgPath() + "." + goatContextType.Name()
-	return typeName == goatContextTypeName
+type ImportManager struct {
+	thisPkgPath   string
+	importsByPath map[string]string
+	importsByName map[string]string
 }
 
-func makeAction(functionName string, signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
+func NewImportManager(thisPkgPath string) *ImportManager {
+	return &ImportManager{
+		thisPkgPath:   thisPkgPath,
+		importsByPath: make(map[string]string),
+		importsByName: make(map[string]string),
+	}
+}
+
+func (im *ImportManager) getImports() []string {
+	// TODO: Remove aliases where possible
+	var imports []string
+	for alias, path := range im.importsByName {
+		imports = append(imports, fmt.Sprintf("%s \"%s\"", alias, path))
+	}
+	return imports
+}
+
+func (im *ImportManager) addImport(name, path string) (alias string) {
+	// If we already have an alias for this path - we just return it
+	if alias, exists := im.importsByPath[path]; exists {
+		return alias
+	}
+	// If the desired name already exists - we create an alternate alias
+	if _, exists := im.importsByName[name]; exists {
+		suffix := 0
+		for {
+			alias := fmt.Sprintf("%s_%d", name, suffix)
+			if _, exists := im.importsByName[alias]; !exists {
+				return im.addImport(alias, path)
+			}
+		}
+	}
+	// If this is a new name and a new path - we add it
+	im.importsByName[name] = path
+	im.importsByPath[path] = name
+
+	return name
+}
+
+func (im *ImportManager) getTypeName(t types.Type) string {
+	switch t := t.(type) {
+	case *types.Named:
+		pkg := t.Obj().Pkg()
+		if pkg.Path() == im.thisPkgPath {
+			return t.Obj().Name()
+		}
+		alias := im.addImport(pkg.Name(), pkg.Path())
+		return alias + "." + t.Obj().Name()
+	case *types.Pointer:
+		return "*" + im.getTypeName(t.Elem())
+	case *types.Basic:
+		if t.Kind() == types.Invalid {
+			panic("Invalid type")
+		}
+		return t.Name()
+	default:
+		panic("WTF is this type???")
+	}
+}
+
+func makeAction(imports *ImportManager, functionName string, signature GoatSignature, actionDescription ActionDescription, flagDescriptions []FlagDescription) Action {
 	flagByArgName := make(map[string]Flag)
-	for _, arg := range signature.Args {
-		flagByArgName[arg.Name] = Flag{
-			Type:      arg.Type,
-			Name:      "\"" + arg.Name + "\"",
-			Default:   "nil",
-			Usage:     "\"\"",
-			IsContext: isGoatContext(arg.Type),
+	for _, param := range getParams(signature.Func) {
+		name := imports.getTypeName(param.Type())
+		flagByArgName[param.Name()] = Flag{
+			Type:    name,
+			Name:    fmt.Sprintf("\"%s\"", param.Name()),
+			Default: "nil",
+			Usage:   "\"\"",
 		}
 	}
 	for _, desc := range flagDescriptions {
-		typ := desc.Type
-		if isGoatContext(typ) {
-			// goat.Context is not a flag type, it's always the context object.
-			continue
-		}
-		name := "\"" + desc.Id + "\""
+
+		flag := flagByArgName[desc.Id]
+
 		if desc.Name != nil {
-			name = *desc.Name
+			flag.Name = *desc.Name
 		}
-		usage := "\"\""
 		if desc.Usage != nil {
-			usage = *desc.Usage
+			flag.Usage = *desc.Usage
 		}
-		default_ := "nil"
 		if desc.Default != nil {
-			default_ = *desc.Default
+			flag.Default = *desc.Default
 		}
-		flagByArgName[desc.Id] = Flag{
-			Type:      typ,
-			Name:      name,
-			Usage:     usage,
-			Default:   default_,
-			IsContext: false,
-		}
+
+		flagByArgName[desc.Id] = flag
 	}
 	var flags []Flag
-	for _, arg := range signature.Args {
-		flag := flagByArgName[arg.Name]
+	for _, param := range getParams(signature.Func) {
+		flag := flagByArgName[param.Name()]
 		flags = append(flags, flag)
 	}
 
-	name := "\"" + signature.Name + "\""
+	name := "\"" + signature.Func.Name() + "\""
 	if actionDescription.Name != nil {
 		name = *actionDescription.Name
 	}
@@ -459,40 +527,7 @@ func makeAction(functionName string, signature GoatSignature, actionDescription 
 	}
 }
 
-func (gh *Goatherd) getFuncDecl(f *types.Func) *ast.FuncDecl {
-	for _, file := range gh.pkg.Syntax {
-		for _, decl := range file.Decls {
-			funcDecl, isFuncDecl := decl.(*ast.FuncDecl)
-			if !isFuncDecl {
-				continue
-			}
-			if gh.pkg.TypesInfo.Defs[funcDecl.Name] == f {
-				return funcDecl
-			}
-		}
-	}
-	return nil
-}
-
-type ImportByName map[string]*ast.ImportSpec
-
-func (gh *Goatherd) getImports() ImportByName {
-	importsByName := make(ImportByName, 0)
-	for _, importSpec := range gh.pkg.Syntax[0].Imports {
-		var name string
-		if importSpec.Name != nil {
-			name = importSpec.Name.Name
-		} else {
-			p := gh.pkg.Imports[strings.Trim(importSpec.Path.Value, "\"")]
-			name = p.Name
-		}
-		importsByName[name] = importSpec
-	}
-
-	return importsByName
-}
-
-func (gh *Goatherd) createAction(actionFunc actionDefinition) (Action, error) {
+func (gh *Goatherd) createAction(imports *ImportManager, actionFunc actionDefinition) (Action, error) {
 	// The AST declaration is used in multiple places, so we get it here.
 	fdecl := gh.findFuncDecl(actionFunc.Func)
 	signature, err := gh.parseSignature(actionFunc.Func)
@@ -511,51 +546,29 @@ func (gh *Goatherd) createAction(actionFunc actionDefinition) (Action, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return makeAction(functionName, signature, actionDescription, flagDescriptions), nil
+	return makeAction(imports, functionName, signature, actionDescription, flagDescriptions), nil
 }
 
 func main() {
 	gh := NewGoatherd(loadPackages())
 	var actions []Action
-	usedImports := make(map[string]bool)
+	importManager := NewImportManager(gh.pkg.PkgPath)
+	for name, path := range map[string]string{
+		"goat":  "github.com/tmr232/goat",
+		"flags": "github.com/tmr232/goat/flags",
+		"cli":   "github.com/urfave/cli/v2",
+	} {
+		importManager.addImport(name, path)
+	}
 	for _, actionFuncDefinition := range gh.findActionFunctions() {
-		if selector, isSelector := actionFuncDefinition.Def.(*ast.SelectorExpr); isSelector {
-			usedImports[selector.X.(*ast.Ident).Name] = true
-
-		}
-		action, err := gh.createAction(actionFuncDefinition)
+		action, err := gh.createAction(importManager, actionFuncDefinition)
 		if err != nil {
 			log.Fatal(err)
 		}
 		actions = append(actions, action)
 	}
 
-	importsByPath := make(map[string]*string)
-	for name, spec := range gh.getImports() {
-		if !usedImports[name] {
-			continue
-		}
-		var alias *string
-		if spec.Name != nil {
-			alias = &spec.Name.Name
-		}
-		importsByPath[spec.Path.Value] = alias
-	}
-
-	baseImports := []string{
-		"\"github.com/tmr232/goat\"",
-		"\"github.com/tmr232/goat/flags\"",
-		"\"github.com/urfave/cli/v2\"",
-	}
-
-	imports := append([]string{}, baseImports...)
-	for path, name := range importsByPath {
-		if name == nil {
-			imports = append(imports, path)
-		} else {
-			imports = append(imports, *name+" "+path)
-		}
-	}
+	imports := importManager.getImports()
 
 	data := struct {
 		Package string
@@ -571,7 +584,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = os.WriteFile(gh.pkg.Name+"_goat.go", []byte(formatSource(file)), 0644)
+	err = os.WriteFile(gh.pkg.Name+"_goat.go", []byte(formatSource(file)), 0o644)
 	if err != nil {
 		log.Fatalf("writing output: %s", err)
 	}

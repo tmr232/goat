@@ -1,10 +1,11 @@
 package goat
 
 import (
-	"github.com/urfave/cli/v2"
 	"log"
 	"os"
 	"reflect"
+
+	"github.com/urfave/cli/v2"
 )
 
 type RunConfig struct {
@@ -18,44 +19,47 @@ type RunConfig struct {
 	Usage          string
 }
 
-var runConfigByFunction map[reflect.Value]RunConfig
-var functionByCliActionFunc map[reflect.Value]reflect.Value
+var runConfigByFunction map[reflect.Value]func() RunConfig
 
 func init() {
-	runConfigByFunction = make(map[reflect.Value]RunConfig)
-	functionByCliActionFunc = make(map[reflect.Value]reflect.Value)
+	runConfigByFunction = make(map[reflect.Value]func() RunConfig)
 }
 
 // Register registers a RunConfig generated from a function.
 //
 // This is only used in generated code.
-func Register(app any, config RunConfig) {
+func Register(app any, makeConfig func() RunConfig) {
 	appValue := reflect.ValueOf(app)
-	runConfigByFunction[appValue] = config
-	functionByCliActionFunc[reflect.ValueOf(config.Action)] = appValue
+	runConfigByFunction[appValue] = makeConfig
+}
+
+func getRunConfigForFunction(f any) RunConfig {
+	return runConfigByFunction[reflect.ValueOf(f)]()
 }
 
 func RunWithArgsE(f any, args []string) error {
-	config := runConfigByFunction[reflect.ValueOf(f)]
+	config := getRunConfigForFunction(f)
 
 	app := &cli.App{
-		Flags:  config.Flags,
-		Action: config.Action,
-		Name:   config.Name,
-		Usage:  config.Usage,
+		Flags:           config.Flags,
+		Action:          config.Action,
+		Name:            config.Name,
+		Usage:           config.Usage,
+		HideHelpCommand: true,
 	}
 
 	return app.Run(args)
 }
 
 func FuncToApp(f any) *cli.App {
-	config := runConfigByFunction[reflect.ValueOf(f)]
+	config := getRunConfigForFunction(f)
 
 	app := &cli.App{
-		Flags:  config.Flags,
-		Action: config.Action,
-		Name:   config.Name,
-		Usage:  config.Usage,
+		Flags:           config.Flags,
+		Action:          config.Action,
+		Name:            config.Name,
+		Usage:           config.Usage,
+		HideHelpCommand: true,
 	}
 	return app
 }
@@ -99,6 +103,9 @@ func (g *GoatGroup) Usage(usage string) *GoatGroup {
 }
 
 func PartsToCommands(parts []AppPart) []*cli.Command {
+	if len(parts) == 0 {
+		return nil
+	}
 	commands := make([]*cli.Command, len(parts))
 	for i, part := range parts {
 		commands[i] = part.cliCommand()
@@ -107,21 +114,23 @@ func PartsToCommands(parts []AppPart) []*cli.Command {
 }
 
 func Command(f any, subcommands ...AppPart) *GoatCommand {
-	config := runConfigByFunction[reflect.ValueOf(f)]
+	config := getRunConfigForFunction(f)
 
 	return &GoatCommand{&cli.Command{
-		Flags:       config.Flags,
-		Action:      config.Action,
-		Name:        config.Name,
-		Usage:       config.Usage,
-		Subcommands: PartsToCommands(subcommands),
+		Flags:           config.Flags,
+		Action:          config.Action,
+		Name:            config.Name,
+		Usage:           config.Usage,
+		Subcommands:     PartsToCommands(subcommands),
+		HideHelpCommand: true,
 	}}
 }
 
 func Group(name string, subcommands ...AppPart) *GoatGroup {
 	return &GoatGroup{&cli.Command{
-		Name:        name,
-		Subcommands: PartsToCommands(subcommands),
+		Name:            name,
+		Subcommands:     PartsToCommands(subcommands),
+		HideHelpCommand: true,
 	}}
 }
 
@@ -134,17 +143,20 @@ func (app Application) RunWithArgsE(args []string) error {
 func (app Application) RunE() error {
 	return app.App.Run(os.Args)
 }
+
 func (app Application) Run() {
 	err := app.App.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
+
 func App(name string, commands ...AppPart) Application {
 	return Application{
 		App: &cli.App{
-			Name:     name,
-			Commands: PartsToCommands(commands),
+			Name:            name,
+			Commands:        PartsToCommands(commands),
+			HideHelpCommand: true,
 		},
 	}
 }

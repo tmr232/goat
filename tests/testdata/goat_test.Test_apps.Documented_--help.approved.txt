@@ -1,0 +1,10 @@
+NAME:
+   Documented - has some neat docs!
+
+                It's just so nice to document your code.
+
+USAGE:
+   Documented [global options] [arguments...]
+
+GLOBAL OPTIONS:
+   --help, -h  show help

@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/pkg/errors"
 	"reflect"
 	"strconv"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func TestMap(t *testing.T) {

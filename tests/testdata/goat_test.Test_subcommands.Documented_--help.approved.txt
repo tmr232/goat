@@ -7,7 +7,7 @@ NAME:
                          It's just so nice to document your code.
 
 USAGE:
-   test-app Documented [command options] [arguments...]
+   test-app Documented command [command options] [arguments...]
 
 OPTIONS:
-   --help, -h  show help (default: false)
+   --help, -h  show help

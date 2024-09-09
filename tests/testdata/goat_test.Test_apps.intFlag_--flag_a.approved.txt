@@ -1,0 +1,11 @@
+Incorrect Usage: invalid value "a" for flag -flag: parse error
+
+NAME:
+   intFlag - A new cli application
+
+USAGE:
+   intFlag [global options] [arguments...]
+
+GLOBAL OPTIONS:
+   --flag value  (default: 0)
+   --help, -h    show help

@@ -1,0 +1,11 @@
+Incorrect Usage: flag provided but not defined: -bla
+
+NAME:
+   renamedFlag - A new cli application
+
+USAGE:
+   renamedFlag [global options] [arguments...]
+
+GLOBAL OPTIONS:
+   --flag value  (default: 0)
+   --help, -h    show help

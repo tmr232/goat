@@ -1,12 +1,12 @@
-test-app intFlag --help
+test-app intFlag
 -----------------------------------------------------
 
 NAME:
    test-app intFlag
 
 USAGE:
-   test-app intFlag [command options] [arguments...]
+   test-app intFlag command [command options] [arguments...]
 
 OPTIONS:
    --flag value  (default: 0)
-   --help, -h    show help (default: false)
+   --help, -h    show help

@@ -1,0 +1,11 @@
+NAME:
+   withIntFlags - A new cli application
+
+USAGE:
+   withIntFlags [global options] [arguments...]
+
+GLOBAL OPTIONS:
+   --required value      (default: 0)
+   --defaultValue value  (default: 42)
+   --optional value      (default: 0)
+   --help, -h            show help
